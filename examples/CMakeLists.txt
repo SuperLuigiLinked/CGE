@@ -1,0 +1,21 @@
+# @file examples/CMakeLists.txt
+
+# ================================================================================================================================
+
+add_executable(cge_demo1)
+add_executable(cge::demo1 ALIAS cge_demo1)
+
+target_sources(cge_demo1 PRIVATE "demo1/main.cpp")
+target_link_libraries(cge_demo1 cge::cge)
+
+target_compile_features(cge_demo1 PRIVATE cxx_std_23)
+
+target_compile_options(cge_demo1
+    PRIVATE
+        "-Weverything"
+        "-Wno-c++98-compat"
+        "-Wno-c++98-compat-pedantic"
+        "-Wno-pre-c++20-compat-pedantic"
+)
+
+# ================================================================================================================================
