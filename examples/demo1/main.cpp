@@ -21,18 +21,22 @@ public:
 
 };
 
+// --------------------------------------------------------------------------------------------------------------------------------
+
 void App::update(cge::Engine engine)
 {
-    const double secs{ engine.elapsed_seconds() };
+    [[maybe_unused]] const double secs{ engine.elapsed_seconds() };
     ++this->updates;
     LOG("[UPDATE] [{:.3f}] {}\n", secs, this->updates);
     
     (void)engine;
 }
 
+// --------------------------------------------------------------------------------------------------------------------------------
+
 void App::render(cge::Engine engine)
 {
-    const double secs{ engine.elapsed_seconds() };
+    [[maybe_unused]] const double secs{ engine.elapsed_seconds() };
     ++this->renders;
     LOG("[RENDER] [{:.3f}] {}\n", secs, this->renders);
 

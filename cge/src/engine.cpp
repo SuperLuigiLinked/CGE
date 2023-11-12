@@ -15,14 +15,11 @@ namespace cge
 {
     void run(Game& game, const InitSettings& settings)
     {
-        EngineImpl impl
-        {
+        EngineImpl impl{
             .game = game,
             .init = settings,
-            .window = {},
-            .update_thread = {},
-            .render_thread = {},
         };
+        impl.renderer.reset(cge::renderer_vk());
         wyn_run(static_cast<void*>(&impl));
     }
 

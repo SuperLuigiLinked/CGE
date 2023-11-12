@@ -14,9 +14,13 @@
 #include <string>
 #include <span>
 
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Weverything"
-#include <cstdio>
-#include <fmt/core.h>
-#define LOG(...) fmt::print(stderr, __VA_ARGS__)
-#pragma clang diagnostic pop
+#if 0
+    #include <cstdio>
+    #pragma clang diagnostic ignored "-Weverything"
+    #pragma clang diagnostic push
+    #include <fmt/core.h>
+    #pragma clang diagnostic pop
+    #define LOG(...) fmt::print(stderr, __VA_ARGS__)
+#else
+    #define LOG(...) ((void)0)
+#endif

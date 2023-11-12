@@ -2,20 +2,19 @@
 
 # ================================================================================================================================
 
-include(FetchContent)
-
-FetchContent_Declare(WYN
-    GIT_REPOSITORY "https://github.com/SuperLuigiLinked/Wyn"
-    GIT_TAG "main"
-)
-FetchContent_MakeAvailable(WYN)
+set(CGE_DEBUG ON CACHE BOOL "Enables internal debug logging.")
 
 # ================================================================================================================================
 
 add_library(cge)
 add_library(cge::cge ALIAS cge)
 
-target_link_libraries(cge PRIVATE wyn::wyn wyn::wyt)
+target_link_libraries(cge PRIVATE wyn::wyn wyn::wyt Vulkan::Vulkan)
+
+if (CGE_DEBUG)
+    target_link_libraries(cge PRIVATE fmt::fmt)
+    target_compile_definitions(cge PRIVATE "CGE_DEBUG")
+endif()
 
 target_include_directories(cge PUBLIC "include/")
 
@@ -26,15 +25,15 @@ target_sources(cge
         "include/cge/settings.hpp"
         "include/cge/types.hpp"
         "include/cge/vec.hpp"
-)
-
-target_sources(cge
+ 
     PRIVATE
         "src/engine.cpp"
         "src/events.cpp"
-        "src/render.cpp"
-        "src/update.cpp"
+        "src/game.cpp"
+        "src/renderer_vk.cpp"
+        "src/debug.hpp"
         "src/impl.hpp"
+        "src/renderer.hpp"
 )
 
 target_compile_features(cge PRIVATE cxx_std_23)
