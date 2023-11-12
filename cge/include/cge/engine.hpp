@@ -35,9 +35,8 @@ namespace cge
     {
     public:
         virtual ~Game() = default;
-
-        virtual void update(Engine engine) = 0;
-        virtual void render(Engine engine) = 0;
+        virtual void update(Engine engine);
+        virtual void render(Engine engine);
     };
 }
 

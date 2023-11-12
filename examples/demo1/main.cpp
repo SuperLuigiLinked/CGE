@@ -3,17 +3,11 @@
  */
 
 #include <cge/cge.hpp>
+#include "../utils.hpp"
 
 // ================================================================================================================================
 
-#include <array>
-
-#include <print>
-#define LOG(...) std::print(stderr, __VA_ARGS__)
-
-// ================================================================================================================================
-
-class Example final : public cge::Game
+class App final : public cge::Game
 {
 public:
 
@@ -22,76 +16,80 @@ public:
 
 public:
 
-    void update(cge::Engine engine) final
-    {
-        const double secs{ engine.elapsed_seconds() };
-        ++this->updates;
-        LOG("[UPDATE] [{:.3f}] {}\n", secs, this->updates);
-        
-        (void)engine;
-    }
+    void update(cge::Engine engine) final;
+    void render(cge::Engine engine) final;
 
-    void render(cge::Engine engine) final
-    {
-        const double secs{ engine.elapsed_seconds() };
-        ++this->renders;
-        LOG("[RENDER] [{:.3f}] {}\n", secs, this->renders);
-
-        //cge::WindowSettings& window{ engine.window() };
-        cge::RenderSettings& render{ engine.render() };
-
-        render.clear();
-
-        render.backcolor = cge::rgba(
-            float(this->updates / 2 * 1 % 256) / 256.0f,
-            float(this->updates / 2 * 2 % 256) / 256.0f,
-            float(this->updates / 2 * 4 % 256) / 256.0f
-        );
-        // render.backcolor = cge::rgba(0.0f, 0.0f, 0.1f);
-
-        render.triangle(
-            std::array
-            {
-                cge::Vertex {
-                    .xyzw = cge::vec4(1.0f, -1.0f),
-                    .rgba = cge::rgba(0.0f, 1.0f, 0.0f),
-                },
-                cge::Vertex {
-                    .xyzw = cge::vec4(-0.5f, 0.0f),
-                    .rgba = cge::rgba(0.0f, 1.0f, 0.0f),
-                },
-                cge::Vertex {
-                    .xyzw = cge::vec4(1.0f, 1.0f),
-                    .rgba = cge::rgba(0.0f, 1.0f, 0.0f),
-                }
-            }
-        );
-
-        render.triangle(
-            std::array
-            {
-                cge::Vertex {
-                    .xyzw = cge::vec4(-1.0f, -1.0f),
-                    .rgba = cge::rgba(1.0f, 0.0f, 0.0f, 1.0f),
-                },
-                cge::Vertex {
-                    .xyzw = cge::vec4(0.5f, 0.0f),
-                    .rgba = cge::rgba(1.0f, 0.0f, 0.0f, 0.0f),
-                },
-                cge::Vertex {
-                    .xyzw = cge::vec4(-1.0f, 1.0f),
-                    .rgba = cge::rgba(1.0f, 0.0f, 0.0f, 1.0f),
-                }
-            }
-        );
-    }
 };
+
+void App::update(cge::Engine engine)
+{
+    const double secs{ engine.elapsed_seconds() };
+    ++this->updates;
+    LOG("[UPDATE] [{:.3f}] {}\n", secs, this->updates);
+    
+    (void)engine;
+}
+
+void App::render(cge::Engine engine)
+{
+    const double secs{ engine.elapsed_seconds() };
+    ++this->renders;
+    LOG("[RENDER] [{:.3f}] {}\n", secs, this->renders);
+
+    //cge::WindowSettings& window{ engine.window() };
+    cge::RenderSettings& render{ engine.render() };
+
+    render.clear();
+
+    render.backcolor = cge::rgba(
+        float(this->updates / 2 * 1 % 256) / 256.0f,
+        float(this->updates / 2 * 2 % 256) / 256.0f,
+        float(this->updates / 2 * 4 % 256) / 256.0f
+    );
+    // render.backcolor = cge::rgba(0.0f, 0.0f, 0.1f);
+
+    render.triangle(
+        std::array
+        {
+            cge::Vertex {
+                .xyzw = cge::vec4{ 1.0f, -1.0f },
+                .rgba = cge::rgba(0.0f, 1.0f, 0.0f),
+            },
+            cge::Vertex {
+                .xyzw = cge::vec4{ -0.5f, 0.0f },
+                .rgba = cge::rgba(0.0f, 1.0f, 0.0f),
+            },
+            cge::Vertex {
+                .xyzw = cge::vec4{1.0f, 1.0f},
+                .rgba = cge::rgba(0.0f, 1.0f, 0.0f),
+            }
+        }
+    );
+
+    render.triangle(
+        std::array
+        {
+            cge::Vertex {
+                .xyzw = cge::vec4{ -1.0f, -1.0f },
+                .rgba = cge::rgba(1.0f, 0.0f, 0.0f, 1.0f),
+            },
+            cge::Vertex {
+                .xyzw = cge::vec4{ 0.5f, 0.0f },
+                .rgba = cge::rgba(1.0f, 0.0f, 0.0f, 0.0f),
+            },
+            cge::Vertex {
+                .xyzw = cge::vec4{ -1.0f, 1.0f },
+                .rgba = cge::rgba(1.0f, 0.0f, 0.0f, 1.0f),
+            }
+        }
+    );
+}
 
 // ================================================================================================================================
 
 int main()
 {
-    Example example{};
+    App app{};
 
     const cge::InitSettings settings
     {
@@ -102,7 +100,7 @@ int main()
         .fullscreen = false,
     };
 
-    cge::run(example, settings);
+    cge::run(app, settings);
 
     return 0;
 }

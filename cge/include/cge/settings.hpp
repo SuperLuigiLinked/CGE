@@ -79,16 +79,16 @@ namespace cge
 
     private:
 
-        std::size_t updates;
-        std::size_t renders;
-        double fps;
-        bool vsync;
+        [[maybe_unused]] std::size_t updates;
+        [[maybe_unused]] std::size_t renders;
+        [[maybe_unused]] double fps;
+        [[maybe_unused]] bool vsync;
 
     public:
 
         inline constexpr void clear() noexcept
         {
-            this->backcolor = cge::vec4(0.0f, 0.0f, 0.0f, 1.0f);
+            this->backcolor = cge::vec4{ 0.0f, 0.0f, 0.0f, 1.0f };
 
             this->point_vtx.clear();
             this->line_vtx.clear();

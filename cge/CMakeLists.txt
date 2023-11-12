@@ -2,6 +2,16 @@
 
 # ================================================================================================================================
 
+include(FetchContent)
+
+FetchContent_Declare(WYN
+    GIT_REPOSITORY "https://github.com/SuperLuigiLinked/Wyn"
+    GIT_TAG "main"
+)
+FetchContent_MakeAvailable(WYN)
+
+# ================================================================================================================================
+
 add_library(cge)
 add_library(cge::cge ALIAS cge)
 
@@ -34,8 +44,8 @@ target_compile_options(cge
         "-Weverything"
         "-Wno-c++98-compat"
         "-Wno-c++98-compat-pedantic"
-        "-Wno-c++20-extensions"
         "-Wno-pre-c++20-compat-pedantic"
+        "-Wno-padded"
 )
 
 # ================================================================================================================================

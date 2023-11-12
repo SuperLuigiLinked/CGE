@@ -7,6 +7,12 @@
 
 namespace cge
 {
+    void Game::update([[maybe_unused]] Engine engine) {}
+    void Game::render([[maybe_unused]] Engine engine) {}
+}
+
+namespace cge
+{
     void run(Game& game, const InitSettings& settings)
     {
         EngineImpl impl
