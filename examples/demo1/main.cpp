@@ -20,18 +20,20 @@ public:
 
 public:
 
-    void update(cge::Engine& engine) final
+    void update(cge::Engine engine) final
     {
+        const double secs{ engine.elapsed_seconds() };
         ++this->updates;
-        LOG("[UPDATE] {}\n", this->updates);
+        LOG("[UPDATE] [{:.3f}] {}\n", secs, this->updates);
         
         (void)engine;
     }
 
-    void render(cge::Engine& engine) final
+    void render(cge::Engine engine) final
     {
+        const double secs{ engine.elapsed_seconds() };
         ++this->renders;
-        LOG("[RENDER] {}\n", this->renders);
+        LOG("[RENDER] [{:.3f}] {}\n", secs, this->renders);
 
         (void)engine;
     }

@@ -5,6 +5,8 @@
 add_library(cge)
 add_library(cge::cge ALIAS cge)
 
+target_link_libraries(cge PRIVATE wyn::wyn wyn::wyt)
+
 target_include_directories(cge PUBLIC "include/")
 
 target_sources(cge
@@ -19,6 +21,10 @@ target_sources(cge
 target_sources(cge
     PRIVATE
         "src/engine.cpp"
+        "src/events.cpp"
+        "src/render.cpp"
+        "src/update.cpp"
+        "src/impl.hpp"
 )
 
 target_compile_features(cge PRIVATE cxx_std_23)
@@ -27,6 +33,8 @@ target_compile_options(cge
     PRIVATE
         "-Weverything"
         "-Wno-c++98-compat"
+        "-Wno-c++98-compat-pedantic"
+        "-Wno-pre-c++20-compat-pedantic"
 )
 
 # ================================================================================================================================

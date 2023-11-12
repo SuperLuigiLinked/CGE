@@ -12,14 +12,18 @@ namespace cge
     class Engine final
     {
     private:
+
         class EngineImpl* impl;
+        friend class EngineImpl;
 
-        Engine(const Engine&) = delete;
-        Engine(Engine&&) = delete;
-        Engine& operator=(const Engine&) = delete;
-        Engine& operator=(Engine&&) = delete;
-
+        explicit inline constexpr Engine(EngineImpl* ptr) noexcept : impl{ ptr } {}
+        
     public:
+
+        void quit() noexcept;
+        bool quitting() const noexcept;
+
+        double elapsed_seconds() const noexcept;
 
     };
 
@@ -28,8 +32,8 @@ namespace cge
     public:
         virtual ~Game() = default;
 
-        virtual void update(Engine& engine) = 0;
-        virtual void render(Engine& engine) = 0;
+        virtual void update(Engine engine) = 0;
+        virtual void render(Engine engine) = 0;
     };
 }
 
