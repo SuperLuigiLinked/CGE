@@ -7,6 +7,8 @@
 #ifndef CGE_ENGINE_H
 #define CGE_ENGINE_H
 
+#include "cge/settings.hpp"
+
 namespace cge
 {
     class Engine final
@@ -23,8 +25,10 @@ namespace cge
         void quit() noexcept;
         bool quitting() const noexcept;
 
-        double elapsed_seconds() const noexcept;
+        WindowSettings& window() noexcept;
+        RenderSettings& render() noexcept;
 
+        double elapsed_seconds() const noexcept;
     };
 
     class Game

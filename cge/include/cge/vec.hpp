@@ -26,6 +26,12 @@ namespace cge
     struct dvec2 { double x, y; }; 
     struct dvec3 { double x, y, z; }; 
     struct dvec4 { double x, y, z, w; }; 
+
+    inline constexpr vec4 rgba() noexcept { return {}; }
+    inline constexpr vec4 rgba(const float v) noexcept { return { v, v, v, 1.0f}; }
+    inline constexpr vec4 rgba(const float v, const float a) noexcept { return { v, v, v, a}; }
+    inline constexpr vec4 rgba(const float r, const float g, const float b) noexcept { return { r, g, b, 1.0f }; }
+    inline constexpr vec4 rgba(const float r, const float g, const float b, const float a) noexcept { return { r, g, b, a }; }
 }
 
 #endif

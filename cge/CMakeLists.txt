@@ -34,6 +34,7 @@ target_compile_options(cge
         "-Weverything"
         "-Wno-c++98-compat"
         "-Wno-c++98-compat-pedantic"
+        "-Wno-c++20-extensions"
         "-Wno-pre-c++20-compat-pedantic"
 )
 

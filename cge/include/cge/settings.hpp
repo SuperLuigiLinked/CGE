@@ -86,22 +86,156 @@ namespace cge
 
     public:
 
-        void clear();
+        inline constexpr void clear() noexcept
+        {
+            this->backcolor = cge::vec4(0.0f, 0.0f, 0.0f, 1.0f);
 
-        void point(const Vertex vtx);
-        void line(const std::span<const Vertex, 2> vtx);
-        void triangle(const std::span<const Vertex, 3> vtx);
-        void line_strip(const std::span<const Vertex /* 2+ */> vtx);
-        void triangle_strip(const std::span<const Vertex /* 3+ */> vtx);
-        void triangle_fan(const std::span<const Vertex /* 3+ */> vtx);
+            this->point_vtx.clear();
+            this->line_vtx.clear();
+            this->triangle_vtx.clear();
+            this->line_strip_vtx.clear();
+            this->line_strip_idx.clear();
+            this->triangle_strip_vtx.clear();
+            this->triangle_strip_idx.clear();
+            this->triangle_fan_vtx.clear();
+            this->triangle_fan_idx.clear();
 
-        void uv_point(const Vertex vtx);
-        void uv_line(const std::span<const Vertex, 2> vtx);
-        void uv_triangle(const std::span<const Vertex, 3> vtx);
-        void uv_line_strip(const std::span<const Vertex /* 2+ */> vtx);
-        void uv_triangle_strip(const std::span<const Vertex /* 3+ */> vtx);
-        void uv_triangle_fan(const std::span<const Vertex /* 3+ */> vtx);
+            this->uv_point_vtx.clear();
+            this->uv_line_vtx.clear();
+            this->uv_triangle_vtx.clear();
+            this->uv_line_strip_vtx.clear();
+            this->uv_line_strip_idx.clear();
+            this->uv_triangle_strip_vtx.clear();
+            this->uv_triangle_strip_idx.clear();
+            this->uv_triangle_fan_vtx.clear();
+            this->uv_triangle_fan_idx.clear();
+        }
 
+        inline constexpr void point(const Vertex vtx)
+        {
+            this->point_vtx.push_back(vtx);
+        }
+
+        inline constexpr void line(const std::span<const Vertex, 2> vtx)
+        {
+            this->line_vtx.push_back(vtx[0]);
+            this->line_vtx.push_back(vtx[1]);
+        }
+
+        inline constexpr void triangle(const std::span<const Vertex, 3> vtx)
+        {
+            this->triangle_vtx.push_back(vtx[0]);
+            this->triangle_vtx.push_back(vtx[1]);
+            this->triangle_vtx.push_back(vtx[2]);
+        }
+
+        inline constexpr void line_strip(const std::span<const Vertex /* 2+ */> vtx)
+        {
+            if (vtx.size() >= 2)
+            {
+                Index idx{ static_cast<Index>(this->line_strip_vtx.size()) };
+                for (const Vertex& v : vtx)
+                {
+                    this->line_strip_vtx.push_back(v);
+                    this->line_strip_idx.push_back(idx);
+                    ++idx;
+                }
+                this->line_strip_idx.push_back(sentinel_idx);
+            }
+        }
+
+        inline constexpr void triangle_strip(const std::span<const Vertex /* 3+ */> vtx)
+        {
+            if (vtx.size() >= 3)
+            {
+                Index idx{ static_cast<Index>(this->triangle_strip_vtx.size()) };
+                for (const Vertex& v : vtx)
+                {
+                    this->triangle_strip_vtx.push_back(v);
+                    this->triangle_strip_idx.push_back(idx);
+                    ++idx;
+                }
+                this->triangle_strip_idx.push_back(sentinel_idx);
+            }
+        }
+
+        inline constexpr void triangle_fan(const std::span<const Vertex /* 3+ */> vtx)
+        {
+            if (vtx.size() >= 3)
+            {
+                Index idx{ static_cast<Index>(this->triangle_fan_vtx.size()) };
+                for (const Vertex& v : vtx)
+                {
+                    this->triangle_fan_vtx.push_back(v);
+                    this->triangle_fan_idx.push_back(idx);
+                    ++idx;
+                }
+                this->triangle_fan_idx.push_back(sentinel_idx);
+            }
+        }
+
+        inline constexpr void uv_point(const VertexUV vtx)
+        {
+            this->uv_point_vtx.push_back(vtx);
+        }
+
+        inline constexpr void uv_line(const std::span<const VertexUV, 2> vtx)
+        {
+            this->uv_line_vtx.push_back(vtx[0]);
+            this->uv_line_vtx.push_back(vtx[1]);
+        }
+
+        inline constexpr void uv_triangle(const std::span<const VertexUV, 3> vtx)
+        {
+            this->uv_triangle_vtx.push_back(vtx[0]);
+            this->uv_triangle_vtx.push_back(vtx[1]);
+            this->uv_triangle_vtx.push_back(vtx[2]);
+        }
+
+        inline constexpr void uv_line_strip(const std::span<const VertexUV /* 2+ */> vtx)
+        {
+            if (vtx.size() >= 2)
+            {
+                Index idx{ static_cast<Index>(this->uv_line_strip_vtx.size()) };
+                for (const VertexUV& v : vtx)
+                {
+                    this->uv_line_strip_vtx.push_back(v);
+                    this->uv_line_strip_idx.push_back(idx);
+                    ++idx;
+                }
+                this->uv_line_strip_idx.push_back(sentinel_idx);
+            }
+        }
+
+        inline constexpr void uv_triangle_strip(const std::span<const VertexUV /* 3+ */> vtx)
+        {
+            if (vtx.size() >= 3)
+            {
+                Index idx{ static_cast<Index>(this->uv_triangle_strip_vtx.size()) };
+                for (const VertexUV& v : vtx)
+                {
+                    this->uv_triangle_strip_vtx.push_back(v);
+                    this->uv_triangle_strip_idx.push_back(idx);
+                    ++idx;
+                }
+                this->uv_triangle_strip_idx.push_back(sentinel_idx);
+            }
+        }
+
+        inline constexpr void uv_triangle_fan(const std::span<const VertexUV /* 3+ */> vtx)
+        {
+            if (vtx.size() >= 3)
+            {
+                Index idx{ static_cast<Index>(this->uv_triangle_fan_vtx.size()) };
+                for (const VertexUV& v : vtx)
+                {
+                    this->uv_triangle_fan_vtx.push_back(v);
+                    this->uv_triangle_fan_idx.push_back(idx);
+                    ++idx;
+                }
+                this->uv_triangle_fan_idx.push_back(sentinel_idx);
+            }
+        }
     };
 }
 

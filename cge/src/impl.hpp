@@ -21,7 +21,9 @@ namespace cge
     public:
         Game& game;
         InitSettings init;
-
+        WindowSettings win_settings;
+        RenderSettings gfx_settings;
+        
         wyt_time_t epoch;
 
         wyn_window_t window;

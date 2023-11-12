@@ -42,8 +42,19 @@ namespace cge
         return impl->quit_flag.test(std::memory_order::relaxed);
     }
 
+    WindowSettings& Engine::window() noexcept
+    {
+        return impl->win_settings;
+    }
+
+    RenderSettings& Engine::render() noexcept
+    {
+        return impl->gfx_settings;
+    }
+    
     double Engine::elapsed_seconds() const noexcept
     {
         return double(wyt_nanotime() - impl->epoch) / 1'000'000'000.0;
     }
+
 }

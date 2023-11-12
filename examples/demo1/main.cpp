@@ -6,6 +6,8 @@
 
 // ================================================================================================================================
 
+#include <array>
+
 #include <print>
 #define LOG(...) std::print(stderr, __VA_ARGS__)
 
@@ -35,7 +37,53 @@ public:
         ++this->renders;
         LOG("[RENDER] [{:.3f}] {}\n", secs, this->renders);
 
-        (void)engine;
+        //cge::WindowSettings& window{ engine.window() };
+        cge::RenderSettings& render{ engine.render() };
+
+        render.clear();
+
+        render.backcolor = cge::rgba(
+            float(this->updates / 2 * 1 % 256) / 256.0f,
+            float(this->updates / 2 * 2 % 256) / 256.0f,
+            float(this->updates / 2 * 4 % 256) / 256.0f
+        );
+        // render.backcolor = cge::rgba(0.0f, 0.0f, 0.1f);
+
+        render.triangle(
+            std::array
+            {
+                cge::Vertex {
+                    .xyzw = cge::vec4(1.0f, -1.0f),
+                    .rgba = cge::rgba(0.0f, 1.0f, 0.0f),
+                },
+                cge::Vertex {
+                    .xyzw = cge::vec4(-0.5f, 0.0f),
+                    .rgba = cge::rgba(0.0f, 1.0f, 0.0f),
+                },
+                cge::Vertex {
+                    .xyzw = cge::vec4(1.0f, 1.0f),
+                    .rgba = cge::rgba(0.0f, 1.0f, 0.0f),
+                }
+            }
+        );
+
+        render.triangle(
+            std::array
+            {
+                cge::Vertex {
+                    .xyzw = cge::vec4(-1.0f, -1.0f),
+                    .rgba = cge::rgba(1.0f, 0.0f, 0.0f, 1.0f),
+                },
+                cge::Vertex {
+                    .xyzw = cge::vec4(0.5f, 0.0f),
+                    .rgba = cge::rgba(1.0f, 0.0f, 0.0f, 0.0f),
+                },
+                cge::Vertex {
+                    .xyzw = cge::vec4(-1.0f, 1.0f),
+                    .rgba = cge::rgba(1.0f, 0.0f, 0.0f, 1.0f),
+                }
+            }
+        );
     }
 };
 
