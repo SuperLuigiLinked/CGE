@@ -27,6 +27,35 @@ namespace cge
             wyn_window_t window;
         };
 
+        static inline constexpr std::array instance_exts{
+            "VK_KHR_portability_enumeration",
+            "VK_KHR_surface",
+        #if defined(WYN_WIN32)
+            "VK_KHR_win32_surface",
+        #elif defined(WYN_COCOA)
+            "VK_EXT_metal_surface",
+        #elif defined(WYN_XLIB)
+            "VK_KHR_xlib_surface",
+        #elif defined(WYN_XCB)
+            "VK_KHR_xcb_surface",
+        #endif
+        #if !defined(NDEBUG)
+            "VK_EXT_debug_utils"
+        #endif
+        };
+
+        static inline constexpr std::array device_exts{
+            "VK_KHR_swapchain"
+        };
+        
+        static inline constexpr std::array instance_layers{
+            "VK_LAYER_KHRONOS_validation"
+        };
+        
+        static inline constexpr std::array device_layers{
+            "VK_LAYER_KHRONOS_validation"
+        };
+
     private:
 
         Context context;
@@ -71,6 +100,8 @@ namespace cge
 
 namespace cge
 {
+
+
     /**
      * @see Vulkan:
      * - https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkApplicationInfo.html
@@ -86,22 +117,25 @@ namespace cge
             .applicationVersion = {},
             .pEngineName = {},
             .engineVersion = {},
-            .apiVersion = VK_VERSION_1_0,
+            .apiVersion = VK_MAKE_API_VERSION(0, 1, 0, 0),
         };
+
         const VkInstanceCreateInfo create_info{
             .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
             .pNext = {},
-            .flags = {},
+            .flags = VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR,
             .pApplicationInfo = &app_info,
-            .enabledLayerCount = {},
-            .ppEnabledLayerNames = {},
-            .enabledExtensionCount = {},
-            .ppEnabledExtensionNames = {},
+            .enabledLayerCount = uint32_t(instance_layers.size()),
+            .ppEnabledLayerNames = instance_layers.data(),
+            .enabledExtensionCount = uint32_t(instance_exts.size()),
+            .ppEnabledExtensionNames = instance_exts.data(),
         };
-        vkCreateInstance(&create_info, nullptr, &context.instance);
+        
+        const VkResult res{ vkCreateInstance(&create_info, nullptr, &context.instance) };
+        ASSERT(res == VK_SUCCESS);
         ASSERT(context.instance);
 
-        LOG("[VK] SUCCESS!\n");
+        LOG("[CGE] VK INSTANCE!\n");
     }
 
     void Renderer_VK::deinit_context()

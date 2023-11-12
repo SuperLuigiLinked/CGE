@@ -12,7 +12,7 @@ namespace cge
     {
     public:
         virtual ~Renderer() = default;
-        virtual void render(EngineImpl& impl) = 0;
+        virtual void render(EngineImpl& impl);
     };
 
     extern Renderer* renderer_vk();

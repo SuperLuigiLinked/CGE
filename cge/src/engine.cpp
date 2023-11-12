@@ -9,6 +9,7 @@ namespace cge
 {
     void Game::update([[maybe_unused]] Engine engine) {}
     void Game::render([[maybe_unused]] Engine engine) {}
+    void Renderer::render([[maybe_unused]] EngineImpl& impl) {}
 }
 
 namespace cge
