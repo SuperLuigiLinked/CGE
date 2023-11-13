@@ -429,7 +429,6 @@ namespace cge
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCreateWin32SurfaceKHR.html
             const VkResult res_surface{ vkCreateWin32SurfaceKHR(context.instance, &create_info, nullptr, &gfx.surface_handle) };
         #elif defined(WYN_COCOA)
-            #error "Unimplemented"
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkMacOSSurfaceCreateInfoMVK.html
             const VkMacOSSurfaceCreateInfoMVK create_info{
                 .sType = VK_STRUCTURE_TYPE_MACOS_SURFACE_CREATE_INFO_MVK,
@@ -440,31 +439,28 @@ namespace cge
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCreateMacOSSurfaceMVK.html
             const VkResult res_surface{ vkCreateMacOSSurfaceMVK(context.instance, &create_info, nullptr, &gfx.surface_handle) };
         #elif defined(WYN_XLIB)
-            #error "Unimplemented"
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkXlibSurfaceCreateInfoKHR.html
             const VkXlibSurfaceCreateInfoKHR create_info{
                 .sType = VK_STRUCTURE_TYPE_XLIB_SURFACE_CREATE_INFO_KHR,
                 .pNext = {},
                 .flags = {},
                 .dpy = static_cast<Display*>(gfx.context),
-                .window = static_cast<Window>(gfx.window),
+                .window = static_cast<Window>(std::uintptr_t(gfx.window)),
             };
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCreateXlibSurfaceKHR.html
             const VkResult res_surface{ vkCreateXlibSurfaceKHR(context.instance, &create_info, nullptr, &gfx.surface_handle) };
-        #elif defined(WYN_XCB)
-            #error "Unimplemented"
+        #elif defined(WYN_XCB) || defined(WYN_X11)
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkXcbSurfaceCreateInfoKHR.html
             const VkXcbSurfaceCreateInfoKHR create_info{
                 .sType = VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR,
                 .pNext = {},
                 .flags = {},
                 .connection = static_cast<xcb_connection_t*>(gfx.context),
-                .window = static_cast<xcb_window_t>(gfx.window),
+                .window = static_cast<xcb_window_t>(std::uintptr_t(gfx.window)),
             };
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCreateXcbSurfaceKHR.html
             const VkResult res_surface{ vkCreateXcbSurfaceKHR(context.instance, &create_info, nullptr, &gfx.surface_handle) };
         #elif defined(WYN_WAYLAND)
-            #error "Unimplemented"
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkWaylandSurfaceCreateInfoKHR.html
             const VkWaylandSurfaceCreateInfoKHR create_info{
                 .sType = VK_STRUCTURE_TYPE_WAYLAND_SURFACE_CREATE_INFO_KHR,
