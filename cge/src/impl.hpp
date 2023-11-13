@@ -26,7 +26,7 @@ namespace cge
         Game& game;
         wyt_sem_t sem_game;
         
-        InitSettings init;
+        Settings settings;
         WindowSettings win_settings;
         RenderSettings gfx_settings;
 

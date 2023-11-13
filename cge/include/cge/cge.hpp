@@ -9,7 +9,6 @@
 #define CGE_H
 
 #include "cge/types.hpp"
-#include "cge/vec.hpp"
 #include "cge/settings.hpp"
 #include "cge/engine.hpp"
 

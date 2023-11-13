@@ -45,27 +45,27 @@ void App::render(cge::Engine engine)
 
     render.clear();
 
-    render.backcolor = cge::rgba(
+    render.backcolor = cge::RGBA::splat(
         float(this->updates / 2 * 1 % 256) / 256.0f,
         float(this->updates / 2 * 2 % 256) / 256.0f,
         float(this->updates / 2 * 4 % 256) / 256.0f
     );
-    // render.backcolor = cge::rgba(0.0f, 0.0f, 0.1f);
+    // render.backcolor = cge::RGBA::splat(0.0f, 0.0f, 0.1f);
 
     render.triangle(
         std::array
         {
             cge::Vertex {
                 .xyzw = cge::vec4{ 1.0f, -1.0f },
-                .rgba = cge::rgba(0.0f, 1.0f, 0.0f),
+                .st = { 0xFF00FF00 },
             },
             cge::Vertex {
                 .xyzw = cge::vec4{ -0.5f, 0.0f },
-                .rgba = cge::rgba(0.0f, 1.0f, 0.0f),
+                .st = { 0xFF00FF00 },
             },
             cge::Vertex {
                 .xyzw = cge::vec4{1.0f, 1.0f},
-                .rgba = cge::rgba(0.0f, 1.0f, 0.0f),
+                .st = { 0xFF00FF00 },
             }
         }
     );
@@ -75,15 +75,15 @@ void App::render(cge::Engine engine)
         {
             cge::Vertex {
                 .xyzw = cge::vec4{ -1.0f, -1.0f },
-                .rgba = cge::rgba(1.0f, 0.0f, 0.0f, 1.0f),
+                .st = { 0xFFFF0000 },
             },
             cge::Vertex {
                 .xyzw = cge::vec4{ 0.5f, 0.0f },
-                .rgba = cge::rgba(1.0f, 0.0f, 0.0f, 0.0f),
+                .st = { 0x00FF0000 },
             },
             cge::Vertex {
                 .xyzw = cge::vec4{ -1.0f, 1.0f },
-                .rgba = cge::rgba(1.0f, 0.0f, 0.0f, 1.0f),
+                .st = { 0xFFFF0000 },
             }
         }
     );

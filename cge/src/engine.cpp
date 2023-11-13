@@ -18,7 +18,16 @@ namespace cge
     {
         EngineImpl impl{
             .game = game,
-            .init = settings,
+            .settings = {
+                .fps = settings.fps,
+                .vsync = settings.vsync,
+            },
+            .win_settings = {
+                .rect = {
+                    .size = { settings.width, settings.height }
+                },
+                .fullscreen = settings.fullscreen
+            },
         };
         impl.renderer.reset(cge::renderer_vk());
         wyn_run(static_cast<void*>(&impl));

@@ -9,7 +9,7 @@ namespace cge
 {
     static void render_loop(EngineImpl& impl)
     {
-        const wyt_duration_t frame_nanos{ static_cast<wyt_duration_t>(1'000'000'000.0 / impl.init.fps) };
+        const wyt_duration_t frame_nanos{ static_cast<wyt_duration_t>(1'000'000'000.0 / impl.settings.fps) };
 
         while (!impl.engine().quitting())
         {
@@ -18,6 +18,7 @@ namespace cge
                 const SemLock lock{ impl.sem_game };
                 impl.game.render(impl.engine());
             }
+            impl.renderer->render(impl);
         }
     }
 
@@ -36,7 +37,7 @@ namespace cge
 {
     static void update_loop(EngineImpl& impl)
     {
-        const wyt_duration_t frame_nanos{ static_cast<wyt_duration_t>(1'000'000'000.0 / impl.init.fps) };
+        const wyt_duration_t frame_nanos{ static_cast<wyt_duration_t>(1'000'000'000.0 / impl.settings.fps) };
 
         while (!impl.engine().quitting())
         {

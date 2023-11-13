@@ -24,7 +24,6 @@ target_sources(cge
         "include/cge/engine.hpp"
         "include/cge/settings.hpp"
         "include/cge/types.hpp"
-        "include/cge/vec.hpp"
  
     PRIVATE
         "src/engine.cpp"
