@@ -138,17 +138,15 @@ namespace cge
 
 namespace cge
 {
-    static constexpr const char* unknown_str{ "???" };
-
     static constexpr const char* vk_msg_severity(const VkDebugUtilsMessageSeverityFlagBitsEXT val) noexcept
     {
         switch (val)
         {
-        case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT: return "ERROR";
+        case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT  : return "ERROR  ";
         case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT: return "WARNING";
-        case VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT: return "INFO";
+        case VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT   : return "INFO   ";
         case VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT: return "VERBOSE";
-        default: return unknown_str;
+                                                     default: return "???    ";
         }
     }
 
@@ -156,10 +154,10 @@ namespace cge
     {
         switch (val)
         {
-        case VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT: return "GENERAL";
-        case VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT: return "VALIDATION";
+        case VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT    : return "GENERAL    ";
+        case VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT : return "VALIDATION ";
         case VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT: return "PERFORMANCE";
-        default: return unknown_str;
+                                                     default: return "???        ";
         }
     }
 
@@ -173,9 +171,9 @@ namespace cge
     {
         const char* const str_svrt{ vk_msg_severity(svrt) };
         const char* const str_type{ vk_msg_type(types) };
-        const char* const str_id{ data ? data->pMessageIdName : unknown_str };
+        const char* const str_id{ data ? data->pMessageIdName : "???" };
         const char* const str_msg{ data ? data->pMessage : "" };
-        LOG("\n[VULKAN DEBUG - {} {}] <{}>\n{}\n", str_type, str_svrt, str_id, str_msg);
+        LOG("[ VULKAN DEBUG - {} {} ] {} | {}\n", str_type, str_svrt, str_id, str_msg);
         return VK_FALSE;
     }
 }
