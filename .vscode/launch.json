@@ -6,9 +6,6 @@
             "request": "launch",
             "name": "Debug",
             "program": "${workspaceFolder}/build/examples/cge_demo1",
-            "osx": {
-                "program": "${workspaceFolder}/build/examples/cge_demo1.app"
-            },
             "args": [],
             "cwd": "${workspaceFolder}",
             "internalConsoleOptions": "neverOpen",
