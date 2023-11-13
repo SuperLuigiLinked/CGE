@@ -10,7 +10,6 @@
     #define VK_USE_PLATFORM_WIN32_KHR
 #elif defined(WYN_COCOA)
     #define VK_USE_PLATFORM_METAL_EXT
-    #define VK_USE_PLATFORM_MACOS_MVK
 #elif defined(WYN_X11)
     #error "Unimplemented"
 #elif defined(WYN_XLIB)
@@ -24,6 +23,7 @@
 
 #include "cge/cge.hpp"
 #include "impl.hpp"
+#include "mvk.hpp"
 #include "renderer.hpp"
 #include "debug.hpp"
 
@@ -139,14 +139,14 @@ namespace cge
             "VK_KHR_surface", ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_KHR_surface.html
         #if defined(WYN_WIN32)
             "VK_KHR_win32_surface", ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_KHR_win32_surface.html
-        #elif defined(WYN_COCOA)
-            "VK_EXT_metal_surface", ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_EXT_metal_surface.html
         #elif defined(WYN_XLIB)
             "VK_KHR_xlib_surface", ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_KHR_xlib_surface.html
         #elif defined(WYN_XCB)
             "VK_KHR_xcb_surface", ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_KHR_xcb_surface.html
         #elif defined(WYN_WAYLAND)
             "VK_KHR_wayland_surface", ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_KHR_wayland_surface.html
+        #elif defined(WYN_COCOA)
+            "VK_EXT_metal_surface", ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_EXT_metal_surface.html
         #else
             #error "Unimplemented"
         #endif
@@ -428,16 +428,6 @@ namespace cge
             };
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCreateWin32SurfaceKHR.html
             const VkResult res_surface{ vkCreateWin32SurfaceKHR(context.instance, &create_info, nullptr, &gfx.surface_handle) };
-        #elif defined(WYN_COCOA)
-            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkMacOSSurfaceCreateInfoMVK.html
-            const VkMacOSSurfaceCreateInfoMVK create_info{
-                .sType = VK_STRUCTURE_TYPE_MACOS_SURFACE_CREATE_INFO_MVK,
-                .pNext = {},
-                .flags = {},
-                .view = static_cast<NSView*>(gfx.context),
-            };
-            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCreateMacOSSurfaceMVK.html
-            const VkResult res_surface{ vkCreateMacOSSurfaceMVK(context.instance, &create_info, nullptr, &gfx.surface_handle) };
         #elif defined(WYN_XLIB)
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkXlibSurfaceCreateInfoKHR.html
             const VkXlibSurfaceCreateInfoKHR create_info{
@@ -471,6 +461,16 @@ namespace cge
             };
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCreateWaylandSurfaceKHR.html
             const VkResult res_surface{ vkCreateWaylandSurfaceKHR(context.instance, &create_info, nullptr, &gfx.surface_handle) };
+        #elif defined(WYN_COCOA)
+            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkMetalSurfaceCreateInfoEXT.html
+            const VkMetalSurfaceCreateInfoEXT create_info{
+                .sType = VK_STRUCTURE_TYPE_METAL_SURFACE_CREATE_INFO_EXT,
+                .pNext = {},
+                .flags = {},
+                .pLayer = static_cast<const CAMetalLayer*>(cge::mvk::create_layer(gfx.window)),
+            };
+            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCreateMetalSurfaceEXT.html
+            const VkResult res_surface{ vkCreateMetalSurfaceEXT(context.instance, &create_info, nullptr, &gfx.surface_handle) };
         #else
             #error "Unimplemented"
         #endif

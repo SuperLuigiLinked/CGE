@@ -34,6 +34,10 @@ target_sources(cge
         "src/impl.hpp"
         "src/renderer.hpp"
 )
+if (APPLE)
+    target_sources(cge PRIVATE "src/mvk.mm" "src/mvk.hpp")
+    target_link_libraries(cge PRIVATE "-framework QuartzCore")
+endif()
 
 target_compile_features(cge PRIVATE cxx_std_23)
 
