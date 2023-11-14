@@ -2,9 +2,11 @@
  * @file renderer_vk.cpp
  */
 
+#include <cstring>
 #include <optional>
 #include <array>
 #include <vector>
+#include <span>
 
 #if defined(WYN_WIN32)
     #define VK_USE_PLATFORM_WIN32_KHR
@@ -32,7 +34,7 @@
 #endif
 
 #define CGE_LOAD_INSTANCE(handle, var, func) var.func = reinterpret_cast<PFN_##func>(vkGetInstanceProcAddr(handle, #func))
-#define CGE_LOAD_DEVICE(handle, var, func) var.func = reinterpret_cast<PFN_##func>(vkGetDeviceProcAddr(handle, #func))
+//#define CGE_LOAD_DEVICE(handle, var, func) var.func = reinterpret_cast<PFN_##func>(vkGetDeviceProcAddr(handle, #func))
 
 namespace cge
 {
@@ -89,19 +91,21 @@ namespace cge
             void* window;  ///< HWND      | Window   | xcb_window_t      | wl_surface* | NSWindow*
             void* context; ///< HINSTANCE | Display* | xcb_connection_t* | wl_display* | NSView*
 
-            VkExtent2D surface_size; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkExtent2D.html
             VkSurfaceKHR surface_handle; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSurfaceKHR.html
+            VkExtent2D surface_size; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkExtent2D.html
 
             VkDevice device; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDevice.html
             VkQueue queue_present; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkQueue.html
             VkQueue queue_graphics; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkQueue.html
-            std::size_t device_idx;
-            std::size_t queue_graphics_idx;
-            std::size_t queue_present_idx;
+            std::uint32_t device_idx;
+            std::uint32_t queue_graphics_idx;
+            std::uint32_t queue_present_idx;
 
-            std::vector<bool> ds_support;
-            std::vector<VkPresentModeKHR> ds_modes; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPresentModeKHR.html
-            std::vector<VkSurfaceFormatKHR> ds_formats; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSurfaceFormatKHR.html
+            std::uint32_t ds_mode_count;
+            std::uint32_t ds_format_count;
+            std::vector<std::vector<VkBool32>> ds_present_supports; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkBool32.html
+            std::vector<std::vector<VkPresentModeKHR>> ds_present_modes; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPresentModeKHR.html
+            std::vector<std::vector<VkSurfaceFormatKHR>> ds_formats; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSurfaceFormatKHR.html
             std::vector<VkSurfaceCapabilitiesKHR> ds_capabilities; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSurfaceCapabilitiesKHR.html
 
             VkBuffer buffer_staging; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkBuffer.html
@@ -124,6 +128,7 @@ namespace cge
             VkPipeline pipeline_graphics; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPipeline.html
 
             VkSwapchainKHR swapchain; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSwapchainKHR.html
+            
             std::vector<VkFence> frame_fence; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkFence.html
             std::vector<VkSemaphore> frame_sem_render; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSemaphore.html
             std::vector<VkSemaphore> frame_sem_image; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSemaphore.html
@@ -134,7 +139,7 @@ namespace cge
             std::size_t frame_idx;
         };
 
-        static inline constexpr std::array instance_extensions{
+        static inline constexpr std::array req_instance_extensions{
             "VK_KHR_portability_enumeration", ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_KHR_portability_enumeration.html
             "VK_KHR_surface", ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_KHR_surface.html
         #if defined(WYN_WIN32)
@@ -155,15 +160,15 @@ namespace cge
         #endif
         };
 
-        static inline constexpr std::array device_extensions{
+        static inline constexpr std::array req_device_extensions{
             "VK_KHR_swapchain", ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_KHR_swapchain.html
         };
         
-        static inline constexpr std::array instance_layers{
+        static inline constexpr std::array req_instance_layers{
             "VK_LAYER_KHRONOS_validation", ///< https://vulkan.lunarg.com/doc/view/1.3.204.1/windows/khronos_validation_layer.html
         };
         
-        static inline constexpr std::array device_layers{
+        static inline constexpr std::array req_device_layers{
             "VK_LAYER_KHRONOS_validation", ///< https://vulkan.lunarg.com/doc/view/1.3.204.1/windows/khronos_validation_layer.html
         };
 
@@ -181,11 +186,16 @@ namespace cge
         void create_renderable(wyn_window_t window, bool vsync);
         void destroy_renderable();
 
+        static std::uint64_t rank_device(Context& ctx, Renderable& gfx, std::uint32_t device_idx);
+        static std::uint64_t rank_device_graphics(Context& ctx, Renderable& gfx, std::uint32_t device_idx, std::uint32_t queue_idx);
+        static std::uint64_t rank_device_present(Context& ctx, Renderable& gfx, std::uint32_t device_idx, std::uint32_t queue_idx);
+
     public:
 
         Renderer_VK();
         ~Renderer_VK() final;
 
+        void target_window(EngineImpl& impl, wyn_window_t window) final;
         void render(EngineImpl& impl) final;
     };
 }
@@ -248,7 +258,7 @@ namespace cge
         const char* const str_type{ vk_msg_type(types) };
         const char* const str_id{ data ? data->pMessageIdName : "???" };
         const char* const str_msg{ data ? data->pMessage : "" };
-        LOG("[ VULKAN DEBUG - {} {} ] {} | {}\n", str_type, str_svrt, str_id, str_msg);
+        CGE_LOG("[ VULKAN DEBUG - {} {} ] {} | {}\n", str_type, str_svrt, str_id, str_msg);
         return VK_FALSE;
     }
 }
@@ -257,7 +267,7 @@ namespace cge
 {
     void Renderer_VK::reinit_context()
     {
-        LOG("[CGE] Initializing Vulkan Context...\n");
+        CGE_LOG("[CGE] Initializing Vulkan Context...\n");
         {
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkApplicationInfo.html
             const VkApplicationInfo app_info{
@@ -275,38 +285,38 @@ namespace cge
                 .pNext = {},
                 .flags = VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR,
                 .pApplicationInfo = &app_info,
-                .enabledLayerCount = std::uint32_t(instance_layers.size()),
-                .ppEnabledLayerNames = instance_layers.data(),
-                .enabledExtensionCount = std::uint32_t(instance_extensions.size()),
-                .ppEnabledExtensionNames = instance_extensions.data(),
+                .enabledLayerCount = std::uint32_t(req_instance_layers.size()),
+                .ppEnabledLayerNames = req_instance_layers.data(),
+                .enabledExtensionCount = std::uint32_t(req_instance_extensions.size()),
+                .ppEnabledExtensionNames = req_instance_extensions.data(),
             };
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCreateInstance.html
             const VkResult res_instance{ vkCreateInstance(&create_info, nullptr, &context.instance) };
-            ASSERT(res_instance == VK_SUCCESS);
+            CGE_ASSERT(res_instance == VK_SUCCESS);
 
-            LOG("[CGE] VK INSTANCE\n");
+            CGE_LOG("[CGE] VK INSTANCE\n");
         }
         {
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkEnumerateInstanceExtensionProperties.html
             const VkResult res_extension_count{ vkEnumerateInstanceExtensionProperties(nullptr, &context.instance_extension_count, nullptr) };
-            ASSERT(res_extension_count == VK_SUCCESS);
+            CGE_ASSERT(res_extension_count == VK_SUCCESS);
             context.instance_extensions.resize(context.instance_extension_count);
             const VkResult res_extensions{ vkEnumerateInstanceExtensionProperties(nullptr, &context.instance_extension_count, context.instance_extensions.data()) };
-            ASSERT((res_extensions == VK_SUCCESS) || (res_extensions == VK_INCOMPLETE));
+            CGE_ASSERT((res_extensions == VK_SUCCESS) || (res_extensions == VK_INCOMPLETE));
 
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkEnumerateInstanceLayerProperties.html
             const VkResult res_layer_count{ vkEnumerateInstanceLayerProperties(&context.instance_layer_count, nullptr) };
-            ASSERT(res_layer_count == VK_SUCCESS);
+            CGE_ASSERT(res_layer_count == VK_SUCCESS);
             context.instance_layers.resize(context.instance_layer_count);
             const VkResult res_layers{ vkEnumerateInstanceLayerProperties(&context.instance_layer_count, context.instance_layers.data()) };
-            ASSERT((res_layers == VK_SUCCESS) || (res_layers == VK_INCOMPLETE));
+            CGE_ASSERT((res_layers == VK_SUCCESS) || (res_layers == VK_INCOMPLETE));
 
-            LOG("[CGE] VK INSTANCE PROPERTIES\n");
+            CGE_LOG("[CGE] VK INSTANCE PROPERTIES\n");
         }
         {
-            ASSERT((CGE_LOAD_INSTANCE(context.instance, pfn, vkCreateDebugUtilsMessengerEXT)));
+            CGE_ASSERT((CGE_LOAD_INSTANCE(context.instance, pfn, vkCreateDebugUtilsMessengerEXT)));
 
-            LOG("[CGE] VK INSTANCE FUNCTIONS\n");
+            CGE_LOG("[CGE] VK INSTANCE FUNCTIONS\n");
         }
         #if defined(CGE_DEBUG_VK)
         {
@@ -322,15 +332,15 @@ namespace cge
             };
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCreateDebugUtilsMessengerEXT.html
             const VkResult res_debug{ pfn.vkCreateDebugUtilsMessengerEXT(context.instance, &create_info, nullptr, &context.messenger) };
-            ASSERT(res_debug == VK_SUCCESS);
+            CGE_ASSERT(res_debug == VK_SUCCESS);
 
-            LOG("[CGE] VK DEBUG\n");
+            CGE_LOG("[CGE] VK DEBUG\n");
         }
         #endif
         {
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkEnumeratePhysicalDevices.html
             const VkResult res_count{ vkEnumeratePhysicalDevices(context.instance, &context.device_count, nullptr) };
-            ASSERT(res_count == VK_SUCCESS);
+            CGE_ASSERT(res_count == VK_SUCCESS);
             context.device_handles.resize(context.device_count);
             context.device_extension_counts.resize(context.device_count);
             context.device_extensions.resize(context.device_count);
@@ -342,12 +352,12 @@ namespace cge
             context.device_queue_family_counts.resize(context.device_count);
             context.device_queue_families.resize(context.device_count);
             const VkResult res_handles{ vkEnumeratePhysicalDevices(context.instance, &context.device_count, context.device_handles.data()) };
-            ASSERT((res_handles == VK_SUCCESS) || (res_handles == VK_INCOMPLETE));
+            CGE_ASSERT((res_handles == VK_SUCCESS) || (res_handles == VK_INCOMPLETE));
             
-            LOG("[CGE] VK PHYSICAL DEVICES\n");
+            CGE_LOG("[CGE] VK PHYSICAL DEVICES\n");
         }
         {
-            ASSERT(context.device_count > 0);
+            CGE_ASSERT(context.device_count > 0);
 
             for (std::uint32_t idx{}; idx < context.device_count; ++idx)
             {
@@ -364,17 +374,17 @@ namespace cge
 
                 // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkEnumerateDeviceExtensionProperties.html
                 const VkResult res_extension_count{ vkEnumerateDeviceExtensionProperties(handle, nullptr, &extension_count, nullptr) };
-                ASSERT(res_extension_count == VK_SUCCESS);
+                CGE_ASSERT(res_extension_count == VK_SUCCESS);
                 extensions.resize(extension_count);
                 const VkResult res_extensions{ vkEnumerateDeviceExtensionProperties(handle, nullptr, &extension_count, extensions.data()) };
-                ASSERT((res_extensions == VK_SUCCESS) || (res_extensions == VK_INCOMPLETE));
+                CGE_ASSERT((res_extensions == VK_SUCCESS) || (res_extensions == VK_INCOMPLETE));
 
                 // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkEnumerateDeviceLayerProperties.html
                 const VkResult res_layer_count{ vkEnumerateDeviceLayerProperties(handle, &layer_count, nullptr) };
-                ASSERT(res_layer_count == VK_SUCCESS);
+                CGE_ASSERT(res_layer_count == VK_SUCCESS);
                 layers.resize(layer_count);
                 const VkResult res_layers{ vkEnumerateDeviceLayerProperties(handle, &layer_count, layers.data()) };
-                ASSERT((res_layers == VK_SUCCESS) || (res_layers == VK_INCOMPLETE));
+                CGE_ASSERT((res_layers == VK_SUCCESS) || (res_layers == VK_INCOMPLETE));
 
                 // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceQueueFamilyProperties.html
                 vkGetPhysicalDeviceQueueFamilyProperties(handle, &queue_family_count, nullptr);
@@ -391,7 +401,7 @@ namespace cge
                 vkGetPhysicalDeviceMemoryProperties(handle, &memory);
             }
 
-            LOG("[CGE] VK PHYSICAL DEVICE PROPERTIES\n");
+            CGE_LOG("[CGE] VK PHYSICAL DEVICE PROPERTIES\n");
         }
     }
 
@@ -405,16 +415,16 @@ namespace cge
 {
     void Renderer_VK::create_renderable(wyn_window_t const window, bool const vsync)
     {
-        LOG("[CGE] Initializing Vulkan Window...\n");
+        CGE_LOG("[CGE] Initializing Vulkan Window...\n");
         Renderable& gfx{ this->renderable.emplace() };
         {
             gfx.window = static_cast<void*>(window);
-            ASSERT(gfx.window);
+            CGE_ASSERT(gfx.window);
 
             gfx.context = wyn_native_context(window);
-            ASSERT(gfx.context);
+            CGE_ASSERT(gfx.context);
 
-            LOG("[CGE] VK WINDOW CONTEXT\n");
+            CGE_LOG("[CGE] VK WINDOW CONTEXT\n");
         }
         {
         #if defined(WYN_WIN32)
@@ -474,9 +484,120 @@ namespace cge
         #else
             #error "Unimplemented"
         #endif
-            ASSERT(res_surface == VK_SUCCESS);
+            CGE_ASSERT(res_surface == VK_SUCCESS);
 
-            LOG("[CGE] VK DEVICE SURFACE\n");
+            const wyn_size_t size{ wyn_window_size(gfx.window) };
+            gfx.surface_size = { .width = uint32_t(size.w), .height = uint32_t(size.h) };
+
+            CGE_LOG("[CGE] VK SURFACE\n");
+        }
+        {
+            const std::uint32_t device_count{  context.device_count };
+            gfx.ds_present_supports.resize(device_count);
+            gfx.ds_present_modes.resize(device_count);
+            gfx.ds_formats.resize(device_count);
+            gfx.ds_capabilities.resize(device_count);
+            
+            for (std::uint32_t di{}; di < device_count; ++di)
+            {
+                VkPhysicalDevice& device{ context.device_handles[di] };
+                VkSurfaceKHR& surface{ gfx.surface_handle };
+                std::vector<VkBool32>& present_supports{ gfx.ds_present_supports[di] };
+                std::vector<VkPresentModeKHR>& present_modes{ gfx.ds_present_modes[di] };
+                std::vector<VkSurfaceFormatKHR>& formats{ gfx.ds_formats[di] };
+                VkSurfaceCapabilitiesKHR& capabilities{ gfx.ds_capabilities[di] };
+                std::uint32_t& mode_count{ gfx.ds_mode_count };
+                std::uint32_t& format_count{ gfx.ds_format_count };
+
+                const std::uint32_t queue_count{ context.device_queue_family_counts[di] };
+                present_supports.resize(queue_count);
+
+                for (std::uint32_t qi{}; qi < queue_count; ++qi)
+                {
+                    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceSurfaceSupportKHR.html
+                    const VkResult res_support{ vkGetPhysicalDeviceSurfaceSupportKHR(device, qi, surface, &present_supports[qi]) };
+                    CGE_ASSERT(res_support == VK_SUCCESS);
+                }
+
+                // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceSurfacePresentModesKHR.html
+                const VkResult res_mode_count{ vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &mode_count, nullptr) };
+                CGE_ASSERT(res_mode_count == VK_SUCCESS);
+                present_modes.resize(mode_count);
+                const VkResult res_modes{ vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &mode_count, present_modes.data()) };
+                CGE_ASSERT((res_modes == VK_SUCCESS) || (res_modes == VK_INCOMPLETE));
+                
+                // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceSurfaceFormatsKHR.html
+                const VkResult res_format_count{ vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &format_count, nullptr) };
+                CGE_ASSERT(res_format_count == VK_SUCCESS);
+                formats.resize(format_count);
+                const VkResult res_formats{ vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &format_count, formats.data()) };
+                CGE_ASSERT((res_formats == VK_SUCCESS) || (res_formats == VK_INCOMPLETE));
+
+                // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceSurfaceCapabilitiesKHR.html
+                const VkResult res_caps{ vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &capabilities) };
+                CGE_ASSERT(res_caps == VK_SUCCESS);
+            }
+
+            CGE_LOG("[CGE] VK DEVICE SURFACE\n");
+        }
+        {
+            std::uint32_t device_idx{};
+            std::uint32_t graphics_idx{};
+            std::uint32_t present_idx{};
+            std::uint64_t device_rank{};
+            std::uint64_t graphics_rank{};
+            std::uint64_t present_rank{};
+
+            const std::uint32_t device_count{ context.device_count };
+            for (std::uint32_t di{}; di < device_count; ++di)
+            {
+                const uint64_t rank_d{ rank_device(context, gfx, di) };
+                {
+                    const auto& dev_props{ context.device_properties[di] };
+                    CGE_LOG("[CGE] Device: ({:2}) \"{}\"\n", rank_d, dev_props.deviceName);
+                }
+
+                if (rank_d > device_rank)
+                {
+                    device_idx = di;
+                    device_rank = rank_d;
+                    graphics_idx = 0;
+                    graphics_rank = 0;
+                    present_idx = 0;
+                    present_rank = 0;
+
+                    const std::uint32_t queue_count{ context.device_queue_family_counts[di] };
+                    for (std::uint32_t qi{}; qi < queue_count; ++qi)
+                    {
+                        const std::uint64_t rank_g{ rank_device_graphics(context, gfx, di, qi) };
+                        if (rank_g > graphics_rank)
+                        {
+                            graphics_idx = qi;
+                            graphics_rank = rank_g;
+                        }
+
+                        const std::uint64_t rank_p{ rank_device_present(context, gfx, di, qi) };
+                        if (rank_p > present_rank)
+                        {
+                            present_idx = qi;
+                            present_rank = rank_g;
+                        }
+                    }
+                }
+            }
+
+            gfx.device_idx = device_idx;
+            gfx.queue_graphics_idx = graphics_idx;
+            gfx.queue_present_idx = present_idx;
+
+            {
+                const auto& dev_props{ context.device_properties[gfx.device_idx] };
+                CGE_LOG("[CGE] Selected: \"{}\"\n", dev_props.deviceName);
+            }
+            CGE_LOG("[CGE] VK DEVICE SELECTION\n");
+        }
+        {
+
         }
         (void)vsync;
     }
@@ -489,10 +610,108 @@ namespace cge
 
 namespace cge
 {
+    inline static bool str_equal(const char* const a, const char* const b) noexcept
+    {
+        return std::strcmp(a, b) == 0;
+    }
+
+    inline static bool has_extensions(const std::span<const VkExtensionProperties> sup_exts, const std::span<const char* const> req_exts) noexcept
+    {
+        for (const char* const req : req_exts)
+        {
+            for (const VkExtensionProperties& sup : sup_exts)
+            {
+                if (str_equal(req, sup.extensionName)) goto found;
+            }
+            return false;
+        found:
+        }
+        return true;
+    }
+
+    inline static bool has_layers(const std::span<const VkLayerProperties> sup_lyrs, const std::span<const char* const> req_lyrs) noexcept
+    {
+        for (const char* const req : req_lyrs)
+        {
+            for (const VkLayerProperties& sup : sup_lyrs)
+            {
+                if (str_equal(req, sup.layerName)) goto found;
+            }
+            return false;
+        found:
+        }
+        return true;
+    }
+
+    std::uint64_t Renderer_VK::rank_device(Context& ctx, Renderable& gfx, std::uint32_t device_idx)
+    {
+        const VkPhysicalDeviceProperties& device_props{ ctx.device_properties[device_idx] };
+        const std::span<const VkExtensionProperties> device_exts{ ctx.device_extensions[device_idx] };
+        const std::span<const VkLayerProperties> device_lyrs{ ctx.device_layers[device_idx] };
+
+        if (gfx.ds_format_count == 0) return 0;
+        if (gfx.ds_mode_count == 0) return 0;
+        if (!cge::has_extensions(device_exts, req_device_extensions)) return 0;
+        if (!cge::has_layers(device_lyrs, req_device_layers)) return 0;
+
+        std::uint64_t rank{ 1 };
+
+        switch (device_props.deviceType)
+        {
+        case VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU  : rank += 50; break;
+        case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU: rank += 40; break;
+        case VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU   : rank += 30; break;
+        case VK_PHYSICAL_DEVICE_TYPE_CPU           : rank += 20; break;
+        case VK_PHYSICAL_DEVICE_TYPE_OTHER         : rank += 10; break;
+        default: break;
+        }
+
+        return rank;
+    }
+
+    std::uint64_t Renderer_VK::rank_device_graphics(Context& ctx, [[maybe_unused]] Renderable& gfx, std::uint32_t device_idx, std::uint32_t queue_idx)
+    {
+        const VkQueueFamilyProperties& qf_props{ ctx.device_queue_families[device_idx][queue_idx] };
+
+        if ((qf_props.queueFlags & VK_QUEUE_GRAPHICS_BIT) == 0) return 0;
+
+        std::uint64_t rank{ 1 };
+
+        rank += qf_props.queueCount;
+
+        return rank;
+    }
+
+    std::uint64_t Renderer_VK::rank_device_present(Context& ctx, Renderable& gfx, std::uint32_t device_idx, std::uint32_t queue_idx)
+    {
+        const VkQueueFamilyProperties& qf_props{ ctx.device_queue_families[device_idx][queue_idx] };
+        const VkBool32 supports_present{ gfx.ds_present_supports[device_idx][queue_idx] };
+
+        if (!supports_present) return 0;
+
+        std::uint64_t rank{ 1 };
+
+        rank += qf_props.queueCount;
+
+        return rank;
+    }
+
+}
+
+namespace cge
+{
+    void Renderer_VK::target_window(EngineImpl& impl, wyn_window_t const window)
+    {
+        if (this->renderable.has_value()) destroy_renderable();
+
+        if (window)
+            create_renderable(wyn_window_t(window), impl.settings.vsync);
+    }
+
     void Renderer_VK::render(EngineImpl& impl)
     {
-        if (!this->renderable.has_value()) create_renderable(impl.window, impl.settings.vsync);
-
-        
+        Renderable& gfx{ this->renderable.value() };
+        (void)impl;
+        (void)gfx;
     }
 }

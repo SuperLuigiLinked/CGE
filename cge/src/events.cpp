@@ -20,6 +20,9 @@ extern "C"
 
         impl.sem_game = wyt_sem_create(1, 1);
         if (!impl.sem_game) return impl.engine().quit();
+        
+        wyn_window_resize(impl.window, { impl.win_settings.width, impl.win_settings.height });
+        impl.renderer->target_window(impl, impl.window);
 
         wyn_window_show(impl.window);
 

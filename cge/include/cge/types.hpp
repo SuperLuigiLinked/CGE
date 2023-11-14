@@ -15,28 +15,6 @@ namespace cge
 {
     // --------------------------------------------------------------------------------------------------------------------------------
 
-    using Coord = double;
-
-    using Extent = double;
-
-    struct Point
-    {
-        Coord x, y;
-    };
-    
-    struct Size
-    {
-        Extent w, h;
-    };
-    
-    struct Rect
-    {
-        Point origin;
-        Size size;
-    };
-
-    // --------------------------------------------------------------------------------------------------------------------------------
-
     struct ivec2 { int32_t x, y; }; 
     struct ivec3 { int32_t x, y, z; }; 
     struct ivec4 { int32_t x, y, z, w; }; 

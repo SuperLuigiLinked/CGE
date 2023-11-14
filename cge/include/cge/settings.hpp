@@ -16,8 +16,8 @@ namespace cge
 {
     struct InitSettings
     {
-        Extent width;
-        Extent height;
+        double width;
+        double height;
         double fps;
         bool vsync;
         bool fullscreen;
@@ -26,7 +26,8 @@ namespace cge
     struct WindowSettings
     {
         const char* name;
-        Rect rect;
+        double width;
+        double height;
         bool fullscreen;
     };
 

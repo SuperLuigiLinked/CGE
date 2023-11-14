@@ -16,6 +16,7 @@ namespace cge
             wyt_nanosleep_for(frame_nanos);
             {
                 const SemLock lock{ impl.sem_game };
+                ++impl.settings.renders;
                 impl.game.render(impl.engine());
             }
             impl.renderer->render(impl);
@@ -44,6 +45,7 @@ namespace cge
             wyt_nanosleep_for(frame_nanos);
             {
                 const SemLock lock{ impl.sem_game };
+                ++impl.settings.updates;
                 impl.game.update(impl.engine());
             }
         }

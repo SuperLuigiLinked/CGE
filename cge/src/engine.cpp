@@ -9,6 +9,7 @@ namespace cge
 {
     void Game::update([[maybe_unused]] Engine engine) {}
     void Game::render([[maybe_unused]] Engine engine) {}
+    void Renderer::target_window([[maybe_unused]] EngineImpl& impl, [[maybe_unused]] wyn_window_t window) {}
     void Renderer::render([[maybe_unused]] EngineImpl& impl) {}
 }
 
@@ -23,10 +24,9 @@ namespace cge
                 .vsync = settings.vsync,
             },
             .win_settings = {
-                .rect = {
-                    .size = { settings.width, settings.height }
-                },
-                .fullscreen = settings.fullscreen
+                .width = settings.width,
+                .height = settings.height,
+                .fullscreen = settings.fullscreen,
             },
         };
         impl.renderer.reset(cge::renderer_vk());
