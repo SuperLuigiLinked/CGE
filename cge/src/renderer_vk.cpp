@@ -151,7 +151,10 @@ namespace cge
         };
 
         static inline constexpr std::array req_instance_extensions{
+        #ifdef __APPLE__
             "VK_KHR_portability_enumeration", ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_KHR_portability_enumeration.html
+            "VK_KHR_get_physical_device_properties2", ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_KHR_get_physical_device_properties2.html
+        #endif
             "VK_KHR_surface", ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_KHR_surface.html
         #if defined(WYN_WIN32)
             "VK_KHR_win32_surface", ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_KHR_win32_surface.html
@@ -172,6 +175,9 @@ namespace cge
         };
 
         static inline constexpr std::array req_device_extensions{
+        #ifdef __APPLE__
+            "VK_KHR_portability_subset", ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_KHR_portability_subset.html
+        #endif
             "VK_KHR_swapchain", ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_KHR_swapchain.html
         };
         
@@ -260,11 +266,11 @@ namespace cge
     {
         switch (val)
         {
-        case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT  : return "ERROR  ";
+        case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT  : return "ERROR";
         case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT: return "WARNING";
-        case VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT   : return "INFO   ";
+        case VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT   : return "INFO";
         case VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT: return "VERBOSE";
-                                                     default: return "???    ";
+                                                     default: return "???";
         }
     }
 
@@ -272,10 +278,10 @@ namespace cge
     {
         switch (val)
         {
-        case VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT    : return "GENERAL    ";
-        case VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT : return "VALIDATION ";
+        case VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT    : return "GENERAL";
+        case VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT : return "VALIDATION";
         case VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT: return "PERFORMANCE";
-                                                     default: return "???        ";
+                                                     default: return "???";
         }
     }
 
@@ -289,9 +295,9 @@ namespace cge
     {
         const char* const str_svrt{ vk_msg_severity(svrt) };
         const char* const str_type{ vk_msg_type(types) };
-        const char* const str_id{ data ? data->pMessageIdName : "???" };
-        const char* const str_msg{ data ? data->pMessage : "" };
-        CGE_LOG("[ VULKAN DEBUG - {} {} ] {} | {}\n", str_type, str_svrt, str_id, str_msg);
+        const char* const str_id{ (data && data->pMessageIdName) ? data->pMessageIdName : "" };
+        const char* const str_msg{ (data && data->pMessage) ? data->pMessage : "" };
+        CGE_LOG("[VULKAN DEBUG - {} {}] {}\n{{\n\t{}\n}}\n", str_type, str_svrt, str_id, str_msg);
         return VK_FALSE;
     }
 }
