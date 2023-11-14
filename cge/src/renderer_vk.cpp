@@ -45,6 +45,7 @@ namespace cge
         struct Functions
         {
             PFN_vkCreateDebugUtilsMessengerEXT vkCreateDebugUtilsMessengerEXT; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCreateDebugUtilsMessengerEXT.html
+            PFN_vkDestroyDebugUtilsMessengerEXT vkDestroyDebugUtilsMessengerEXT; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyDebugUtilsMessengerEXT.html
         };
         
         struct Atlas
@@ -323,7 +324,11 @@ namespace cge
             const VkInstanceCreateInfo create_info{
                 .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
                 .pNext = {},
+            #if defined(__APPLE__)
                 .flags = VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR,
+            #else
+                .flags = {},
+            #endif
                 .pApplicationInfo = &app_info,
                 .enabledLayerCount = std::uint32_t(req_instance_layers.size()),
                 .ppEnabledLayerNames = req_instance_layers.data(),
@@ -355,6 +360,7 @@ namespace cge
         }
         {
             CGE_ASSERT((CGE_LOAD_INSTANCE(ctx.instance, ctx.pfn, vkCreateDebugUtilsMessengerEXT)));
+            CGE_ASSERT((CGE_LOAD_INSTANCE(ctx.instance, ctx.pfn, vkDestroyDebugUtilsMessengerEXT)));
 
             CGE_LOG("[CGE] VK INSTANCE FUNCTIONS\n");
         }
@@ -448,7 +454,13 @@ namespace cge
 
     void Renderer_VK::destroy_context(Context& ctx)
     {
-        (void)ctx;
+    #if defined(CGE_DEBUG_VK)
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyDebugUtilsMessengerEXT.html
+        ctx.pfn.vkDestroyDebugUtilsMessengerEXT(ctx.instance, ctx.messenger, nullptr);
+    #endif
+
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyInstance.html
+        vkDestroyInstance(ctx.instance, nullptr);
     }
 }
 
@@ -807,8 +819,26 @@ namespace cge
     {
         if (gfx.atlas) destroy_atlas(ctx, gfx, *gfx.atlas);
 
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyCommandPool.html
+        vkDestroyCommandPool(gfx.device, gfx.command_pool, nullptr);
+
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyBuffer.html
+        vkDestroyBuffer(gfx.device, gfx.buffer_stg, nullptr);
+        vkDestroyBuffer(gfx.device, gfx.buffer_idx, nullptr);
+        vkDestroyBuffer(gfx.device, gfx.buffer_vtx, nullptr);
+
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkFreeMemory.html
         vkFreeMemory(gfx.device, gfx.buffer_memory, nullptr);
+
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroySurfaceKHR.html
+        vkDestroySurfaceKHR(ctx.instance, gfx.surface_handle, nullptr);
+
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDeviceWaitIdle.html
+        const VkResult res_wait{ vkDeviceWaitIdle(gfx.device) };
+        (void)res_wait;
+
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyDevice.html        
+        vkDestroyDevice(gfx.device, nullptr);
     }
 }
 
@@ -934,6 +964,16 @@ namespace cge
     void Renderer_VK::destroy_atlas(Context& ctx, Renderable& gfx, Atlas& atlas)
     {
         (void)ctx;
+
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroySampler.html
+        vkDestroySampler(gfx.device, atlas.sampler, nullptr);
+
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyImageView.html
+        vkDestroyImageView(gfx.device, atlas.view, nullptr);
+
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyImage.html
+        vkDestroyImage(gfx.device, atlas.image, nullptr);
+
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkFreeMemory.html
         vkFreeMemory(gfx.device, atlas.memory, nullptr);
     }
