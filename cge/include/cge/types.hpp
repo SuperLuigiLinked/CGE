@@ -105,8 +105,8 @@ namespace cge
 
     struct Texture
     {
-        std::size_t width;
-        std::size_t height;
+        std::uint32_t width;
+        std::uint32_t height;
         const RGBA* data;
     };
 

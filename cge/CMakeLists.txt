@@ -49,6 +49,7 @@ target_compile_options(cge
         "-Wno-pre-c++20-compat-pedantic"
         "-Wno-padded"
         "-Wno-switch-enum"
+        "-Wno-unsafe-buffer-usage"
         "-Wno-cast-function-type-strict"
 )
 
