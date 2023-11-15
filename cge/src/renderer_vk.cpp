@@ -30,6 +30,12 @@
     #define VK_USE_PLATFORM_WAYLAND_KHR
 #endif
 #include <vulkan/vulkan.h>
+#ifdef _WIN32
+    #undef min
+    #undef max
+    #undef near
+    #undef far
+#endif
 
 #include <shaderc/shaderc.hpp>
 
@@ -152,6 +158,8 @@ namespace cge
 
             VkSwapchainKHR swapchain; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSwapchainKHR.html
             
+            std::uint32_t num_frames;
+            std::uint32_t frame_idx;
             std::vector<VkFence> frame_fence; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkFence.html
             std::vector<VkSemaphore> frame_sem_render; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSemaphore.html
             std::vector<VkSemaphore> frame_sem_image; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSemaphore.html
@@ -159,7 +167,6 @@ namespace cge
             std::vector<VkImageView> frame_views; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkImageView.html
             std::vector<VkFramebuffer> frame_buffers; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkFramebuffer.html
             std::vector<VkCommandBuffer> frame_commands; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkCommandBuffer.html
-            std::size_t frame_idx;
         };
 
         static inline constexpr std::array req_instance_extensions{
@@ -455,14 +462,14 @@ namespace cge
             CGE_ASSERT(res_extension_count == VK_SUCCESS);
             ctx.instance_extensions.resize(ctx.instance_extension_count);
             const VkResult res_extensions{ vkEnumerateInstanceExtensionProperties(nullptr, &ctx.instance_extension_count, ctx.instance_extensions.data()) };
-            CGE_ASSERT((res_extensions == VK_SUCCESS) || (res_extensions == VK_INCOMPLETE));
+            CGE_ASSERT(res_extensions == VK_SUCCESS);
 
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkEnumerateInstanceLayerProperties.html
             const VkResult res_layer_count{ vkEnumerateInstanceLayerProperties(&ctx.instance_layer_count, nullptr) };
             CGE_ASSERT(res_layer_count == VK_SUCCESS);
             ctx.instance_layers.resize(ctx.instance_layer_count);
             const VkResult res_layers{ vkEnumerateInstanceLayerProperties(&ctx.instance_layer_count, ctx.instance_layers.data()) };
-            CGE_ASSERT((res_layers == VK_SUCCESS) || (res_layers == VK_INCOMPLETE));
+            CGE_ASSERT(res_layers == VK_SUCCESS);
 
             CGE_LOG("[CGE] VK INSTANCE PROPERTIES\n");
         }
@@ -506,7 +513,7 @@ namespace cge
             ctx.device_queue_family_counts.resize(ctx.device_count);
             ctx.device_queue_families.resize(ctx.device_count);
             const VkResult res_handles{ vkEnumeratePhysicalDevices(ctx.instance, &ctx.device_count, ctx.device_handles.data()) };
-            CGE_ASSERT((res_handles == VK_SUCCESS) || (res_handles == VK_INCOMPLETE));
+            CGE_ASSERT(res_handles == VK_SUCCESS);
             
             CGE_LOG("[CGE] VK PHYSICAL DEVICES\n");
         }
@@ -531,14 +538,14 @@ namespace cge
                 CGE_ASSERT(res_extension_count == VK_SUCCESS);
                 extensions.resize(extension_count);
                 const VkResult res_extensions{ vkEnumerateDeviceExtensionProperties(handle, nullptr, &extension_count, extensions.data()) };
-                CGE_ASSERT((res_extensions == VK_SUCCESS) || (res_extensions == VK_INCOMPLETE));
+                CGE_ASSERT(res_extensions == VK_SUCCESS);
 
                 // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkEnumerateDeviceLayerProperties.html
                 const VkResult res_layer_count{ vkEnumerateDeviceLayerProperties(handle, &layer_count, nullptr) };
                 CGE_ASSERT(res_layer_count == VK_SUCCESS);
                 layers.resize(layer_count);
                 const VkResult res_layers{ vkEnumerateDeviceLayerProperties(handle, &layer_count, layers.data()) };
-                CGE_ASSERT((res_layers == VK_SUCCESS) || (res_layers == VK_INCOMPLETE));
+                CGE_ASSERT(res_layers == VK_SUCCESS);
 
                 // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceQueueFamilyProperties.html
                 vkGetPhysicalDeviceQueueFamilyProperties(handle, &queue_family_count, nullptr);
@@ -685,14 +692,14 @@ namespace cge
                 CGE_ASSERT(res_mode_count == VK_SUCCESS);
                 present_modes.resize(mode_count);
                 const VkResult res_modes{ vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &mode_count, present_modes.data()) };
-                CGE_ASSERT((res_modes == VK_SUCCESS) || (res_modes == VK_INCOMPLETE));
+                CGE_ASSERT(res_modes == VK_SUCCESS);
                 
                 // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceSurfaceFormatsKHR.html
                 const VkResult res_format_count{ vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &format_count, nullptr) };
                 CGE_ASSERT(res_format_count == VK_SUCCESS);
                 formats.resize(format_count);
                 const VkResult res_formats{ vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &format_count, formats.data()) };
-                CGE_ASSERT((res_formats == VK_SUCCESS) || (res_formats == VK_INCOMPLETE));
+                CGE_ASSERT(res_formats == VK_SUCCESS);
 
                 // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceSurfaceCapabilitiesKHR.html
                 const VkResult res_caps{ vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &capabilities) };
@@ -1329,11 +1336,165 @@ namespace cge
 
             CGE_LOG("[CGE] VK GRAPHICS PIPELINES\n");
         }
+        {
+            const VkSurfaceCapabilitiesKHR& ds_caps{ gfx.ds_capabilities[gfx.device_idx] };
+            const std::span<const VkSurfaceFormatKHR> ds_formats{ gfx.ds_formats[gfx.device_idx] };
+            const std::span<const VkPresentModeKHR> ds_modes{ gfx.ds_present_modes[gfx.device_idx] };
+
+            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSurfaceCapabilitiesKHR.html#_description
+            const std::uint32_t min_images{ ds_caps.minImageCount };
+            const std::uint32_t max_images{ ds_caps.maxImageCount };
+            const std::uint32_t req_images{ min_images + 1};
+            const std::uint32_t num_images{ (max_images == 0) ? req_images : std::min(req_images, max_images) };
+
+            const VkSurfaceFormatKHR best_format{ vk_ideal_format(ds_formats) };
+            const VkPresentModeKHR best_present{ vk_ideal_mode(ds_modes, vsync) };
+            const VkExtent2D best_res{ vk_ideal_resolution(gfx.surface_size, ds_caps) };
+
+            const bool queues_unique{ gfx.queue_graphics_idx != gfx.queue_present_idx };
+            const std::uint32_t queue_concurrent_count{ static_cast<std::uint32_t>(queues_unique ? 2 : 0) };
+            const std::array queue_indices{ gfx.queue_graphics_idx, gfx.queue_present_idx };
+            const std::uint32_t* queue_indices_ptr{ queues_unique ? queue_indices.data() : nullptr };
+            const VkSharingMode queue_sharing{ queues_unique ? VK_SHARING_MODE_CONCURRENT : VK_SHARING_MODE_EXCLUSIVE };
+
+            {
+                // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSwapchainCreateInfoKHR.html#_description
+                const VkSwapchainCreateInfoKHR swapchain_info{
+                    .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
+                    .pNext = {},
+                    .flags = {},
+                    .surface = gfx.surface_handle,
+                    .minImageCount = num_images,
+                    .imageFormat = best_format.format,
+                    .imageColorSpace = best_format.colorSpace,
+                    .imageExtent = best_res,
+                    .imageArrayLayers = 1,
+                    .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+                    .imageSharingMode = queue_sharing,
+                    .queueFamilyIndexCount = queue_concurrent_count,
+                    .pQueueFamilyIndices = queue_indices_ptr,
+                    .preTransform = ds_caps.currentTransform,
+                    .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
+                    .presentMode = best_present,
+                    .clipped = VK_TRUE,
+                    .oldSwapchain = gfx.swapchain,
+                };
+                // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCreateSwapchainKHR.html
+                const VkResult res_swapchain{ vkCreateSwapchainKHR(gfx.device, &swapchain_info, nullptr, &gfx.swapchain) };
+                CGE_ASSERT(res_swapchain == VK_SUCCESS);
+
+                CGE_LOG("[CGE] VK SWAPCHAIN\n");
+            }
+            {
+                // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetSwapchainImagesKHR.html
+                const VkResult res_image_count{ vkGetSwapchainImagesKHR(gfx.device, gfx.swapchain, &gfx.num_frames, nullptr) };
+                CGE_ASSERT(res_image_count == VK_SUCCESS);
+                gfx.frame_idx = 0;
+                gfx.frame_fence.resize(gfx.num_frames);
+                gfx.frame_sem_render.resize(gfx.num_frames);
+                gfx.frame_sem_image.resize(gfx.num_frames);
+                gfx.frame_images.resize(gfx.num_frames);
+                gfx.frame_views.resize(gfx.num_frames);
+                gfx.frame_buffers.resize(gfx.num_frames);
+                gfx.frame_commands.resize(gfx.num_frames);
+                const VkResult res_images{ vkGetSwapchainImagesKHR(gfx.device, gfx.swapchain, &gfx.num_frames, gfx.frame_images.data()) };
+                CGE_ASSERT(res_images == VK_SUCCESS);
+
+                for (std::uint32_t idx{}; idx < gfx.num_frames; ++idx)
+                {
+                    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkFenceCreateInfo.html
+                    constexpr VkFenceCreateInfo fence_info{
+                        .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
+                        .pNext = {},
+                        .flags = VK_FENCE_CREATE_SIGNALED_BIT,
+                    };
+                    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSemaphoreCreateInfo.html
+                    constexpr VkSemaphoreCreateInfo sem_info{
+                        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
+                        .pNext = {},
+                        .flags = {},
+                    };
+                    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCreateFence.html
+                    const VkResult res_fence{ vkCreateFence(gfx.device, &fence_info, nullptr, &gfx.frame_fence[idx]) };
+                    CGE_ASSERT(res_fence == VK_SUCCESS);
+                    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCreateSemaphore.html
+                    const VkResult res_sem_render{ vkCreateSemaphore(gfx.device, &sem_info, nullptr, &gfx.frame_sem_render[idx]) };
+                    CGE_ASSERT(res_sem_render == VK_SUCCESS);
+                    const VkResult res_sem_image{ vkCreateSemaphore(gfx.device, &sem_info, nullptr, &gfx.frame_sem_image[idx]) };
+                    CGE_ASSERT(res_sem_image == VK_SUCCESS);
+
+                    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkImageViewCreateInfo.html
+                    const VkImageViewCreateInfo view_info{
+                        .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+                        .pNext = {},
+                        .flags = {},
+                        .image = gfx.frame_images[idx],
+                        .viewType = VK_IMAGE_VIEW_TYPE_2D,
+                        .format = best_format.format,
+                        .components = {},
+                        .subresourceRange = {
+                            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                            .baseMipLevel = {},
+                            .levelCount = 1,
+                            .baseArrayLayer = {},
+                            .layerCount = 1,
+                        },
+                    };
+                    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCreateImageView.html
+                    const VkResult res_view{ vkCreateImageView(gfx.device, &view_info, nullptr, &gfx.frame_views[idx]) };
+                    CGE_ASSERT(res_view == VK_SUCCESS);
+
+                    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkFramebufferCreateInfo.html
+                    const VkFramebufferCreateInfo buffer_info{
+                        .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
+                        .pNext = {},
+                        .flags = {},
+                        .renderPass = gfx.render_pass,
+                        .attachmentCount = 1,
+                        .pAttachments = &gfx.frame_views[idx],
+                        .width = best_res.width,
+                        .height = best_res.height,
+                        .layers = 1,
+                    };
+                    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCreateFramebuffer.html
+                    const VkResult res_buffer{ vkCreateFramebuffer(gfx.device, &buffer_info, nullptr, &gfx.frame_buffers[idx]) };
+                    CGE_ASSERT(res_buffer == VK_SUCCESS);
+                }
+
+                // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkCommandBufferAllocateInfo.html
+                const VkCommandBufferAllocateInfo alloc_info{
+                    .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+                    .pNext = {},
+                    .commandPool = gfx.command_pool,
+                    .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+                    .commandBufferCount = gfx.num_frames,
+                };
+                // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkAllocateCommandBuffers.html
+                const VkResult res_alloc{ vkAllocateCommandBuffers(gfx.device, &alloc_info, gfx.frame_commands.data()) };
+                CGE_ASSERT(res_alloc == VK_SUCCESS);
+
+                CGE_LOG("[CGE] VK SWAPCHAIN FRAMES\n");
+            }
+        }
         return gfx;
     }
 
     void Renderer_VK::destroy_renderable(Context& ctx, Renderable& gfx)
     {
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyFramebuffer.html
+        for (const VkFramebuffer buffer : gfx.frame_buffers) vkDestroyFramebuffer(gfx.device, buffer, nullptr);
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyImageView.html
+        for (const VkImageView view : gfx.frame_views) vkDestroyImageView(gfx.device, view, nullptr);
+
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroySemaphore.html
+        for (const VkSemaphore sem : gfx.frame_sem_image) vkDestroySemaphore(gfx.device, sem, nullptr);
+        for (const VkSemaphore sem : gfx.frame_sem_render) vkDestroySemaphore(gfx.device, sem, nullptr);
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyFence.html
+        for (const VkFence fence : gfx.frame_fence) vkDestroyFence(gfx.device, fence, nullptr);
+
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroySwapchainKHR.html
+        vkDestroySwapchainKHR(gfx.device, gfx.swapchain, nullptr);
+
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyPipeline.html
         for (const VkPipeline pipeline : gfx.pipelines_graphics) vkDestroyPipeline(gfx.device, pipeline, nullptr);
 
@@ -1342,7 +1503,7 @@ namespace cge
 
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyDescriptorSetLayout.html
         vkDestroyDescriptorSetLayout(gfx.device, gfx.descriptor_layout, nullptr);
-        
+
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyPipelineLayout.html
         vkDestroyPipelineLayout(gfx.device, gfx.pipeline_layout, nullptr);
 
