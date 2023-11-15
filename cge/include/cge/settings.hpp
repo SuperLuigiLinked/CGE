@@ -31,8 +31,6 @@ namespace cge
         bool fullscreen;
     };
 
-    using Index = std::uint16_t;
-
     struct RenderSettings
     {
     public:
@@ -46,6 +44,7 @@ namespace cge
     private:
         
         friend class Renderer;
+        friend class Renderer_VK;
 
         std::vector<Vertex> point_vtx;
         std::vector<Vertex> line_vtx;
