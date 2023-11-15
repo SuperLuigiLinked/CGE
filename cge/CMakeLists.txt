@@ -9,7 +9,7 @@ set(CGE_DEBUG ON CACHE BOOL "Enables internal debug logging.")
 add_library(cge)
 add_library(cge::cge ALIAS cge)
 
-target_link_libraries(cge PRIVATE wyn::wyn wyn::wyt Vulkan::Vulkan)
+target_link_libraries(cge PRIVATE wyn::wyn wyn::wyt Vulkan::Vulkan Vulkan::shaderc_combined)
 
 if (CGE_DEBUG)
     target_link_libraries(cge PRIVATE fmt::fmt)
@@ -49,8 +49,16 @@ target_compile_options(cge
         "-Wno-pre-c++20-compat-pedantic"
         "-Wno-padded"
         "-Wno-switch-enum"
+        "-Wno-braced-scalar-init"
         "-Wno-unsafe-buffer-usage"
         "-Wno-cast-function-type-strict"
+)
+
+# ================================================================================================================================
+
+add_custom_command(
+    TARGET cge POST_BUILD
+    COMMAND "${CMAKE_COMMAND}" -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/src/shaders" "${CMAKE_BINARY_DIR}/examples/shaders"
 )
 
 # ================================================================================================================================

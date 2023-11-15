@@ -2,7 +2,15 @@
  * @file renderer_vk.cpp
  */
 
+#ifdef _WIN32
+    #define _CRT_SECURE_NO_WARNINGS
+#endif
+
 #include <cstring>
+
+#include <fstream>
+#include <filesystem>
+#include <algorithm>
 #include <optional>
 #include <array>
 #include <vector>
@@ -22,6 +30,8 @@
     #define VK_USE_PLATFORM_WAYLAND_KHR
 #endif
 #include <vulkan/vulkan.h>
+
+#include <shaderc/shaderc.hpp>
 
 #include "cge/cge.hpp"
 #include "impl.hpp"
@@ -248,7 +258,54 @@ namespace cge
 
 namespace cge
 {
-    static std::uint32_t vk_find_memtype(const std::span<const VkMemoryType>& mem_types, const std::uint32_t alloc_type, const std::uint32_t alloc_props)
+    static std::string load_txt(const char* const filepath) noexcept
+    {
+        std::string txt{};
+        std::ifstream file{ filepath };
+        std::getline(file, txt, '\0');
+        return txt;
+    }
+
+    static void compile_spirv(const VkDevice device, VkShaderModule& module, const shaderc::Compiler& compiler, const shaderc::CompileOptions& options, const std::string& file_dir, const char* const file_name, const shaderc_shader_kind shader_kind)
+    {
+        const std::string file_path{ file_dir + file_name };
+        const std::string source{ cge::load_txt(file_path.c_str()) };
+        if (source.empty())
+        {
+            const std::string full_path{ std::filesystem::current_path().append(file_path).lexically_normal().string() };
+            CGE_LOG("[CGE] Unable to load file: \"{}\"\n", full_path);
+        }
+        CGE_ASSERT(!source.empty());
+
+        const shaderc::SpvCompilationResult res_compile{ compiler.CompileGlslToSpv(source.c_str(), source.size(), shader_kind, file_name, options) };
+        const shaderc_compilation_status status{ res_compile.GetCompilationStatus() };
+        const std::size_t num_errors{ res_compile.GetNumErrors() };
+        const std::size_t num_warnings{ res_compile.GetNumWarnings() };
+        if (status != shaderc_compilation_status_success)
+        {
+            CGE_LOG("[CGE] SPIR-V Compilation Error! ({} Errors, {} Warnings)\n  {}{}\n", num_errors, num_warnings, file_dir, res_compile.GetErrorMessage());
+        }
+        CGE_ASSERT(status == shaderc_compilation_status_success);
+        
+        const std::vector<std::uint32_t> code{ res_compile.cbegin(), res_compile.cend() };
+
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkShaderModuleCreateInfo.html
+        const VkShaderModuleCreateInfo module_info{
+            .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+            .pNext = {},
+            .flags = {},
+            .codeSize = code.size() * sizeof(std::uint32_t),
+            .pCode = code.data(),
+        };
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCreateShaderModule.html
+        const VkResult res_module{ vkCreateShaderModule(device, &module_info, nullptr, &module) };
+        CGE_ASSERT(res_module == VK_SUCCESS);
+    }
+}
+
+namespace cge
+{
+    static std::uint32_t vk_find_memtype(const std::span<const VkMemoryType>& mem_types, const std::uint32_t alloc_type, const std::uint32_t alloc_props) noexcept
     {
         for (std::uint32_t idx{}; idx < mem_types.size(); ++idx)
         {
@@ -263,6 +320,46 @@ namespace cge
         return std::uint32_t(-1);
     }
 
+    #define CGE_FIND_RETURN(find, range, ...) if (find(__VA_ARGS__) != range.end()) return { __VA_ARGS__ }
+
+    static VkSurfaceFormatKHR vk_ideal_format(const std::span<const VkSurfaceFormatKHR> formats) noexcept
+    {
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSurfaceFormatKHR.html
+        const auto find_format = [&](const VkFormat format, const VkColorSpaceKHR colorspace) {
+            return std::ranges::find_if(formats, [&](const VkSurfaceFormatKHR elem) { return (elem.format == format) && (elem.colorSpace == colorspace); });
+        };
+        CGE_FIND_RETURN(find_format, formats, VK_FORMAT_B8G8R8A8_SRGB, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR);
+        CGE_ASSERT(false);
+    }
+
+    static VkPresentModeKHR vk_ideal_mode [[maybe_unused]] (const std::span<const VkPresentModeKHR> modes, const bool vsync) noexcept
+    {
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPresentModeKHR.html
+        const auto find_mode = [&](const VkPresentModeKHR mode) {
+            return std::ranges::find(modes, mode);
+        };
+        if (!vsync) CGE_FIND_RETURN(find_mode, modes, VK_PRESENT_MODE_IMMEDIATE_KHR);
+        CGE_FIND_RETURN(find_mode, modes, VK_PRESENT_MODE_FIFO_RELAXED_KHR);
+        CGE_FIND_RETURN(find_mode, modes, VK_PRESENT_MODE_FIFO_KHR);
+        CGE_ASSERT(false);
+    }
+
+    static VkExtent2D vk_ideal_resolution [[maybe_unused]] (const VkExtent2D size, const VkSurfaceCapabilitiesKHR& caps) noexcept
+    {
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSurfaceCapabilitiesKHR.html#_description
+        constexpr std::uint32_t special_value{ 0xFFFFFFFF };
+
+        if ((caps.currentExtent.width == special_value) && (caps.currentExtent.height == special_value)) return size;
+        
+        return {
+            .width = std::clamp(size.width, caps.minImageExtent.width, caps.maxImageExtent.width),
+            .height = std::clamp(size.height, caps.minImageExtent.height, caps.maxImageExtent.height),
+        };
+    }
+}
+
+namespace cge
+{
     static constexpr const char* vk_msg_severity(const VkDebugUtilsMessageSeverityFlagBitsEXT val) noexcept
     {
         switch (val)
@@ -466,7 +563,7 @@ namespace cge
 
 namespace cge
 {
-    Renderer_VK::Renderable Renderer_VK::create_renderable(Context& ctx, wyn_window_t const window, bool const vsync)
+    Renderer_VK::Renderable Renderer_VK::create_renderable(Context& ctx, wyn_window_t const window, bool const vsync [[maybe_unused]])
     {
         CGE_LOG("[CGE] Initializing Vulkan Window...\n");
         Renderable gfx{};
@@ -707,6 +804,8 @@ namespace cge
         }
         {
             gfx.atlas.emplace(create_atlas(ctx, gfx, default_texture));
+
+            CGE_LOG("[CGE] VK TEXTURE ATLAS\n");
         }
         {
             constexpr VkDeviceSize MiB{ VkDeviceSize(1) << 20 };
@@ -811,13 +910,90 @@ namespace cge
 
             CGE_LOG("[CGE] VK COMMAND POOL\n");
         }
-        (void)vsync;
+        {
+            const VkSurfaceFormatKHR surface_format{ cge::vk_ideal_format(gfx.ds_formats[gfx.device_idx]) };
+
+            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkAttachmentDescription.html
+            const VkAttachmentDescription attachment_desc{
+                .flags = {},
+                .format = surface_format.format,
+                .samples = VK_SAMPLE_COUNT_1_BIT,
+                .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+                .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+                .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+                .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+                .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+                .finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+            };
+            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkAttachmentReference.html
+            const VkAttachmentReference attachment_ref{
+                .attachment = 0,
+                .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+            };
+            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSubpassDescription.html
+            const VkSubpassDescription subpass_desc{
+                .flags = {},
+                .pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
+                .inputAttachmentCount = 0,
+                .pInputAttachments = {},
+                .colorAttachmentCount = 1,
+                .pColorAttachments = &attachment_ref,
+                .pResolveAttachments = {},
+                .pDepthStencilAttachment = {},
+                .preserveAttachmentCount = 0,
+                .pPreserveAttachments = {},
+            };
+            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSubpassDependency.html
+            const VkSubpassDependency subpass_dep{
+                .srcSubpass = VK_SUBPASS_EXTERNAL,
+                .dstSubpass = 0,
+                .srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                .dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                .srcAccessMask = {},
+                .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+                .dependencyFlags = {},
+            };
+            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkRenderPassCreateInfo.html
+            const VkRenderPassCreateInfo pass_info{
+                .sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
+                .pNext = {},
+                .flags = {},
+                .attachmentCount = 1,
+                .pAttachments = &attachment_desc,
+                .subpassCount = 1,
+                .pSubpasses = &subpass_desc,
+                .dependencyCount = 1,
+                .pDependencies = &subpass_dep,
+            };
+            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCreateRenderPass.html
+            const VkResult res_pass{ vkCreateRenderPass(gfx.device, &pass_info, nullptr, &gfx.render_pass) };
+            CGE_ASSERT(res_pass == VK_SUCCESS);
+
+            CGE_LOG("[CGE] VK RENDER PASS\n");
+        }
+        {
+            const shaderc::Compiler compiler{};
+            const shaderc::CompileOptions options{};
+
+            const std::string file_dir{ "shaders/glsl/" };
+            cge::compile_spirv(gfx.device, gfx.module_vertex, compiler, options, file_dir, "shader.vert", shaderc_shader_kind::shaderc_vertex_shader);
+            cge::compile_spirv(gfx.device, gfx.module_fragment, compiler, options, file_dir, "shader.frag", shaderc_shader_kind::shaderc_fragment_shader);
+
+            CGE_LOG("[CGE] VK SHADERS\n");
+        }
         return gfx;
     }
 
     void Renderer_VK::destroy_renderable(Context& ctx, Renderable& gfx)
     {
         if (gfx.atlas) destroy_atlas(ctx, gfx, *gfx.atlas);
+
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyShaderModule.html
+        vkDestroyShaderModule(gfx.device, gfx.module_fragment, nullptr);
+        vkDestroyShaderModule(gfx.device, gfx.module_vertex, nullptr);
+
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyRenderPass.html
+        vkDestroyRenderPass(gfx.device, gfx.render_pass, nullptr);
 
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyCommandPool.html
         vkDestroyCommandPool(gfx.device, gfx.command_pool, nullptr);

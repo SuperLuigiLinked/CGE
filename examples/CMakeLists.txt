@@ -3,15 +3,15 @@
 
 # ================================================================================================================================
 
-add_executable(cge_demo1)
-add_executable(cge::demo1 ALIAS cge_demo1)
+add_executable(cge_example)
+add_executable(cge::example ALIAS cge_example)
 
-target_sources(cge_demo1 PRIVATE "demo1/main.cpp")
-target_link_libraries(cge_demo1 cge::cge fmt::fmt)
+target_sources(cge_example PRIVATE "example/main.cpp")
+target_link_libraries(cge_example cge::cge fmt::fmt)
 
-target_compile_features(cge_demo1 PRIVATE cxx_std_23)
+target_compile_features(cge_example PRIVATE cxx_std_23)
 
-target_compile_options(cge_demo1
+target_compile_options(cge_example
     PRIVATE
         "-Weverything"
         "-Wno-c++98-compat"
