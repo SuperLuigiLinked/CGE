@@ -21,7 +21,11 @@ FetchContent_Declare(WYN
 )
 FetchContent_MakeAvailable(WYN)
 
-find_package(Vulkan REQUIRED COMPONENTS shaderc_combined glslang SPIRV-Tools)
+if (LINUX)
+    find_package(Vulkan REQUIRED COMPONENTS shaderc_combined glslang SPIRV-Tools)
+else()
+    find_package(Vulkan REQUIRED COMPONENTS shaderc_combined)
+endif()
 
 # ================================================================================================================================
 
@@ -29,6 +33,3 @@ add_subdirectory(cge)
 add_subdirectory(examples)
 
 # ================================================================================================================================
-
-# glslc cge/src/shaders/glsl/shader.frag -o cge/src/shaders/spir-v/frag.spv
-# glslc cge/src/shaders/glsl/shader.vert -o cge/src/shaders/spir-v/vert.spv
