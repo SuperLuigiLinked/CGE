@@ -10,6 +10,9 @@ add_library(cge)
 add_library(cge::cge ALIAS cge)
 
 target_link_libraries(cge PRIVATE wyn::wyn wyn::wyt Vulkan::Vulkan Vulkan::shaderc_combined)
+if (LINUX)
+    target_link_libraries(cge PRIVATE Vulkan::glslang Vulkan::SPIRV-Tools "/lib/libSPIRV-Tools-opt.so")
+endif()
 
 if (CGE_DEBUG)
     target_link_libraries(cge PRIVATE fmt::fmt)

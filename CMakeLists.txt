@@ -21,7 +21,7 @@ FetchContent_Declare(WYN
 )
 FetchContent_MakeAvailable(WYN)
 
-find_package(Vulkan REQUIRED COMPONENTS shaderc_combined)
+find_package(Vulkan REQUIRED COMPONENTS shaderc_combined glslang SPIRV-Tools)
 
 # ================================================================================================================================
 
