@@ -36,6 +36,10 @@ target_sources(cge
         "src/debug.hpp"
         "src/impl.hpp"
         "src/renderer.hpp"
+
+    PRIVATE
+        "src/shaders/glsl/shader.frag"
+        "src/shaders/glsl/shader.vert"
 )
 if (APPLE)
     target_sources(cge PRIVATE "src/mvk.mm" "src/mvk.hpp")

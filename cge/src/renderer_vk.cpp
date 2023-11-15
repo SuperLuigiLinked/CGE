@@ -1352,12 +1352,12 @@ namespace cge
             pipeline_triangle_fan.pInputAssemblyState = &assembly_triangle_fan;
             
             const std::array<VkGraphicsPipelineCreateInfo, num_pipelines> pipeline_infos{
-                pipeline_point_list,
-                pipeline_line_list,
+                pipeline_triangle_fan,
+                pipeline_triangle_strip,
                 pipeline_triangle_list,
                 pipeline_line_strip,
-                pipeline_triangle_strip,
-                pipeline_triangle_fan,
+                pipeline_line_list,
+                pipeline_point_list,
             };
 
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCreateGraphicsPipelines.html
@@ -2162,12 +2162,12 @@ namespace cge
         };
 
         const std::array<VkPipeline, num_pipelines> pipeline_handles{
-            gfx.pipelines_graphics[5], // Triangle Fans
-            gfx.pipelines_graphics[4], // Triangle Strips
-            gfx.pipelines_graphics[3], // Triangles
-            gfx.pipelines_graphics[2], // Line Strips
-            gfx.pipelines_graphics[1], // Lines
-            gfx.pipelines_graphics[0], // Points
+            gfx.pipelines_graphics[0], // Triangle Fans
+            gfx.pipelines_graphics[1], // Triangle Strips
+            gfx.pipelines_graphics[2], // Triangles
+            gfx.pipelines_graphics[3], // Line Strips
+            gfx.pipelines_graphics[4], // Lines
+            gfx.pipelines_graphics[5], // Points
         };
 
         const std::array<VkPipelineLayout, num_pipelines> pipeline_layouts{
@@ -2281,23 +2281,26 @@ namespace cge
                     vkCmdSetViewport(command_buffer, 0, 1, &viewport);
                     vkCmdSetScissor(command_buffer, 0, 1, &scissor);
 
-                    const bool has_idx{ indices[idx].data() != nullptr };
-                    vkCmdBindVertexBuffers(command_buffer, 0, 1, &gfx.buffer_vtx, &vtx_offs[idx]);
-                    if (has_idx) vkCmdBindIndexBuffer(command_buffer, gfx.buffer_idx, idx_offs[idx], VK_INDEX_TYPE_UINT16);
-
+                    const VkDeviceSize vtx_offset{ vtx_offs[idx] };
+                    const VkDeviceSize idx_offset{ idx_offs[idx] - gfx.buffer_idx_offs };
                     const VkDescriptorSet desc_set{ descriptor_sets[idx] };
-                    if (desc_set) vkCmdBindDescriptorSets(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layouts[idx], 0, 1, &desc_set, 0, nullptr);
+                    const VkPipelineLayout layout{ pipeline_layouts[idx] };
+                    const IndexVK vtx_count{ IndexVK(vertices[idx].size()) };
+                    const IndexVK idx_count{ IndexVK(indices[idx].size()) };
+                    const bool has_idx{ indices[idx].data() != nullptr };
+
+                    vkCmdBindVertexBuffers(command_buffer, 0, 1, &gfx.buffer_vtx, &vtx_offset);
 
                     if (has_idx)
-                    {
-                        const IndexVK idx_count{ IndexVK(indices[idx].size()) };
+                        vkCmdBindIndexBuffer(command_buffer, gfx.buffer_idx, idx_offset, VK_INDEX_TYPE_UINT16);
+
+                    if (desc_set)
+                        vkCmdBindDescriptorSets(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, layout, 0, 1, &desc_set, 0, nullptr);
+
+                    if (has_idx)
                         vkCmdDrawIndexed(command_buffer, idx_count, 1, 0, 0, 0);
-                    }
                     else
-                    {
-                        const IndexVK vtx_count{ IndexVK(vertices[idx].size()) };
                         vkCmdDraw(command_buffer, vtx_count, 1, 0, 0);
-                    }
                 }
             }
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCmdEndRenderPass.html

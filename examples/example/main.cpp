@@ -64,7 +64,7 @@ void App::render(cge::Engine engine)
                 .st = { 0xFF00FF00 },
             },
             cge::Vertex {
-                .xyzw = cge::vec4{1.0f, 1.0f},
+                .xyzw = cge::vec4{ 1.0f, 1.0f },
                 .st = { 0xFF00FF00 },
             }
         }
