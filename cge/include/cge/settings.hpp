@@ -7,9 +7,6 @@
 #ifndef CGE_SETTINGS_H
 #define CGE_SETTINGS_H
 
-#include <vector>
-#include <span>
-
 #include "cge/types.hpp"
 
 namespace cge

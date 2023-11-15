@@ -10,6 +10,8 @@
 #include <cstddef>
 #include <cstdint>
 #include <bit>
+#include <span>
+#include <vector>
 
 namespace cge
 {
@@ -110,6 +112,18 @@ namespace cge
         std::uint32_t width;
         std::uint32_t height;
         const RGBA* data;
+
+        inline constexpr std::size_t size() const noexcept
+        { return std::size_t(this->width) * std::size_t(this->height); }
+
+        inline constexpr bool empty() const noexcept
+        { return !this->width || !this->height || !this->data; }
+
+        inline constexpr std::span<const RGBA> elems() const noexcept
+        { return std::span{ this->data, this->size() }; }
+
+        inline constexpr std::span<const std::byte> as_bytes() const noexcept
+        { return std::as_bytes(this->elems()); }
     };
 
     // --------------------------------------------------------------------------------------------------------------------------------
