@@ -43,6 +43,10 @@ namespace cge
 
         RGBA backcolor;
 
+    private:
+        
+        friend class Renderer;
+
         std::vector<Vertex> point_vtx;
         std::vector<Vertex> line_vtx;
         std::vector<Vertex> triangle_vtx;
@@ -122,6 +126,15 @@ namespace cge
         {
             if (vtx.size() >= 3)
             {
+            #ifdef __APPLE__
+                const Index size{ static_cast<Index>(this->triangle_fan_vtx.size()) };
+                for (Index idx{ 1 }; idx < size - 1; ++idx)
+                {
+                    this->triangle_fan_vtx.push_back(vtx[idx]);
+                    this->triangle_fan_vtx.push_back(vtx[idx + 1]);
+                    this->triangle_fan_vtx.push_back(vtx[0]);
+                }
+            #else
                 Index idx{ static_cast<Index>(this->triangle_fan_vtx.size()) };
                 for (const Vertex& v : vtx)
                 {
@@ -130,6 +143,7 @@ namespace cge
                     ++idx;
                 }
                 this->triangle_fan_idx.push_back(sentinel_idx);
+            #endif
             }
         }
     };

@@ -1278,21 +1278,26 @@ namespace cge
                 .pNext = {},
                 .flags = {},
                 .topology = VK_PRIMITIVE_TOPOLOGY_LINE_STRIP,
-                .primitiveRestartEnable = VK_FALSE,
+                .primitiveRestartEnable = VK_TRUE,
             };
             constexpr VkPipelineInputAssemblyStateCreateInfo assembly_triangle_strip{
                 .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
                 .pNext = {},
                 .flags = {},
                 .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP,
-                .primitiveRestartEnable = VK_FALSE,
+                .primitiveRestartEnable = VK_TRUE,
             };
             constexpr VkPipelineInputAssemblyStateCreateInfo assembly_triangle_fan{
                 .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
                 .pNext = {},
                 .flags = {},
-                .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN,
+            #ifdef __APPLE__
+                .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
                 .primitiveRestartEnable = VK_FALSE,
+            #else
+                .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN,
+                .primitiveRestartEnable = VK_TRUE,
+            #endif
             };
 
             VkGraphicsPipelineCreateInfo pipeline_point_list{ default_pipeline };
