@@ -61,7 +61,7 @@ namespace cge
             }
             else
             {
-                std::this_thread::yield();
+                wyt_yield();
             }
             last_tick = wyt_nanotime();
         }
