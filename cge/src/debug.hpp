@@ -4,8 +4,9 @@
 
 #pragma once
 
+
 #include <cstdlib>
-#define CGE_ASSERT(expr) if (expr) {} else std::abort()
+#define CGE_ASSERT(expr) if (expr) {} else (__debugbreak(), std::abort())
 
 #if defined(CGE_DEBUG)
     #pragma clang diagnostic push

@@ -12,6 +12,8 @@
 
 #include <atomic>
 #include <memory>
+#include <mutex>
+#include <condition_variable>
 
 namespace cge
 {
@@ -27,6 +29,9 @@ namespace cge
         wyt_sem_t sem_game;
         
         Settings settings;
+        std::mutex win_mutex;
+        std::condition_variable win_cond;
+        std::atomic<std::uint64_t> win_updates;
         WindowSettings win_settings;
         RenderSettings gfx_settings;
 

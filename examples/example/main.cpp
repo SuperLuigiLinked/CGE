@@ -27,7 +27,7 @@ void App::update(cge::Engine engine)
 {
     [[maybe_unused]] const double secs{ engine.elapsed_seconds() };
     ++this->updates;
-    LOG("[UPDATE] [{:.3f}] {}\n", secs, this->updates);
+    //LOG("[UPDATE] [{:.3f}] {}\n", secs, this->updates);
     
     (void)engine;
 }
@@ -46,26 +46,27 @@ void App::render(cge::Engine engine)
     render.clear();
 
     render.backcolor = cge::RGBA::splat(
-        float(this->updates / 2 * 1 % 256) / 256.0f,
-        float(this->updates / 2 * 2 % 256) / 256.0f,
-        float(this->updates / 2 * 4 % 256) / 256.0f
-    );
-    // render.backcolor = cge::RGBA::splat(0.0f, 0.0f, 0.1f);
+        1.0f - float(std::abs(((std::int64_t(this->updates) / 2) % 510) - 255)) / 255.0f,
+        1.0f - float(std::abs(((std::int64_t(this->updates)    ) % 510) - 255)) / 255.0f,
+        1.0f - float(std::abs(((std::int64_t(this->updates) * 2) % 510) - 255)) / 255.0f
+    ); 
+
+    //render.backcolor = cge::RGBA::splat(0.0f, 0.0f, 0.25f);
 
     render.triangle(
         std::array
         {
             cge::Vertex {
-                .xyzw = cge::vec4{ 1.0f, -1.0f },
-                .st = { 0xFF00FF00 },
+                .xyzw = { -1.0f, -1.0f },
+                .st = { 0xFFFF0000 },
             },
             cge::Vertex {
-                .xyzw = cge::vec4{ -0.5f, 0.0f },
-                .st = { 0xFF00FF00 },
+                .xyzw = { 0.5f, 0.0f },
+                .st = { 0x00FF0000 },
             },
             cge::Vertex {
-                .xyzw = cge::vec4{ 1.0f, 1.0f },
-                .st = { 0xFF00FF00 },
+                .xyzw = { -1.0f, 1.0f },
+                .st = { 0xFFFF0000 },
             }
         }
     );
@@ -74,16 +75,16 @@ void App::render(cge::Engine engine)
         std::array
         {
             cge::Vertex {
-                .xyzw = cge::vec4{ -1.0f, -1.0f },
-                .st = { 0xFFFF0000 },
+                .xyzw = { 1.0f, -1.0f },
+                .st = { 0xFF00FF00 },
             },
             cge::Vertex {
-                .xyzw = cge::vec4{ 0.5f, 0.0f },
-                .st = { 0x00FF0000 },
+                .xyzw = { -0.5f, 0.0f },
+                .st = { 0x0000FF00 },
             },
             cge::Vertex {
-                .xyzw = cge::vec4{ -1.0f, 1.0f },
-                .st = { 0xFFFF0000 },
+                .xyzw = { 1.0f, 1.0f },
+                .st = { 0xFF00FF00 },
             }
         }
     );

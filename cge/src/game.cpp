@@ -9,11 +9,8 @@ namespace cge
 {
     static void render_loop(EngineImpl& impl)
     {
-        const wyt_duration_t frame_nanos{ static_cast<wyt_duration_t>(1'000'000'000.0 / impl.settings.fps) };
-
         while (!impl.engine().quitting())
         {
-            wyt_nanosleep_for(frame_nanos);
             {
                 const SemLock lock{ impl.sem_game };
                 ++impl.settings.renders;

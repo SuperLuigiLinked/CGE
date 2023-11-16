@@ -39,6 +39,9 @@ extern "C"
     {
         EngineImpl& impl{ *static_cast<EngineImpl*>(userdata) };
 
+        impl.win_updates.fetch_add(1, std::memory_order::relaxed);
+        impl.win_cond.notify_all();
+
         if (impl.update_thread)
         {
             wyt_join(impl.update_thread);
@@ -65,6 +68,19 @@ extern "C"
         EngineImpl& impl{ *static_cast<EngineImpl*>(userdata) };
         
         if (impl.engine().quitting()) return wyn_quit();
+
+        {
+            const std::unique_lock<std::mutex> lock(impl.win_mutex);
+
+            const wyn_size_t window_size{ wyn_window_size(impl.window) };
+            impl.win_settings.fullscreen = false;
+            impl.win_settings.width = window_size.w;
+            impl.win_settings.height = window_size.h;
+            impl.win_settings.name = "";
+            
+            impl.win_updates.fetch_add(1, std::memory_order::relaxed);
+            impl.win_cond.notify_all();
+        }
     }
 
     void wyn_on_window_close(void* const userdata, wyn_window_t const window)
