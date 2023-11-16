@@ -6,7 +6,11 @@
 
 
 #include <cstdlib>
-#define CGE_ASSERT(expr) if (expr) {} else (__debugbreak(), std::abort())
+#if defined(__WIN32) && !defined(NDEBUG)
+    #define CGE_ASSERT(expr) if (expr) {} else (__debugbreak(), std::abort())
+#else
+    #define CGE_ASSERT(expr) if (expr) {} else std::abort()
+#endif
 
 #if defined(CGE_DEBUG)
     #pragma clang diagnostic push
