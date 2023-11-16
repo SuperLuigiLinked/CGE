@@ -2122,84 +2122,88 @@ namespace cge
         };
         
         // ======================= RENDERING  ORDER =======================
-        // * Triangle Fans
-        // * Triangle Strips
-        // * Triangles
-        // * Line Strips
-        // * Lines
-        // * Points
+        /* Triangle Fans   */
+        /* Triangle Strips */
+        /* Triangles       */
+        /* Line Strips     */
+        /* Lines           */
+        /* Points          */
         // ----------------------------------------------------------------
 
-        const std::array<std::span<const cge::Vertex>, num_pipelines> vertices{
-            settings.triangle_fan_vtx,   // Triangle Fans
-            settings.triangle_strip_vtx, // Triangle Strips
-            settings.triangle_vtx,       // Triangles
-            settings.line_strip_vtx,     // Line Strips
-            settings.line_vtx,           // Lines
-            settings.point_vtx,          // Points
+        using VertexSpan = std::span<const cge::Vertex>;
+        using IndexSpan = std::span<const cge::Index>;
+        using ByteSpan = std::span<const std::byte>;
+
+        const std::array<VertexSpan, num_pipelines> vertices{
+            /* Triangle Fans   */ VertexSpan{settings.triangle_fan_vtx},
+            /* Triangle Strips */ VertexSpan{settings.triangle_strip_vtx},
+            /* Triangles       */ VertexSpan{settings.triangle_vtx},
+            /* Line Strips     */ VertexSpan{settings.line_strip_vtx},
+            /* Lines           */ VertexSpan{settings.line_vtx},
+            /* Points          */ VertexSpan{settings.point_vtx},
         };
 
-        const std::array<std::span<const cge::Index>, num_pipelines> indices{
+        const std::array<IndexSpan, num_pipelines> indices{
         #ifdef __APPLE__
-            {},                              // Triangle Fans
+            /* Triangle Fans   */ IndexSpan{},
         #else
-            settings.triangle_fan_idx,   // Triangle Fans
+            /* Triangle Fans   */ IndexSpan{settings.triangle_fan_idx},
         #endif
-            settings.triangle_strip_idx, // Triangle Strips
-            {},                          // Triangles
-            settings.line_strip_idx,     // Line Strips
-            {},                          // Lines
-            {},                          // Points
+            /* Triangle Strips */ IndexSpan{settings.triangle_strip_idx},
+            /* Triangles       */ IndexSpan{},
+            /* Line Strips     */ IndexSpan{settings.line_strip_idx},
+            /* Lines           */ IndexSpan{},
+            /* Points          */ IndexSpan{},
         };
 
         const std::array<VkDescriptorSet, num_pipelines> descriptor_sets{
-            gfx.descriptor_set, // Triangle Fans
-            gfx.descriptor_set, // Triangle Strips
-            gfx.descriptor_set, // Triangles
-            gfx.descriptor_set, // Line Strips
-            gfx.descriptor_set, // Lines
-            gfx.descriptor_set, // Points
+            /* Triangle Fans   */ gfx.descriptor_set,
+            /* Triangle Strips */ gfx.descriptor_set,
+            /* Triangles       */ gfx.descriptor_set,
+            /* Line Strips     */ gfx.descriptor_set,
+            /* Lines           */ gfx.descriptor_set,
+            /* Points          */ gfx.descriptor_set,
         };
 
         const std::array<VkPipeline, num_pipelines> pipeline_handles{
-            gfx.pipelines_graphics[0], // Triangle Fans
-            gfx.pipelines_graphics[1], // Triangle Strips
-            gfx.pipelines_graphics[2], // Triangles
-            gfx.pipelines_graphics[3], // Line Strips
-            gfx.pipelines_graphics[4], // Lines
-            gfx.pipelines_graphics[5], // Points
+            /* Triangle Fans   */ gfx.pipelines_graphics[0],
+            /* Triangle Strips */ gfx.pipelines_graphics[1],
+            /* Triangles       */ gfx.pipelines_graphics[2],
+            /* Line Strips     */ gfx.pipelines_graphics[3],
+            /* Lines           */ gfx.pipelines_graphics[4],
+            /* Points          */ gfx.pipelines_graphics[5],
         };
 
         const std::array<VkPipelineLayout, num_pipelines> pipeline_layouts{
-            gfx.pipeline_layout, // Triangle Fans
-            gfx.pipeline_layout, // Triangle Strips
-            gfx.pipeline_layout, // Triangles
-            gfx.pipeline_layout, // Line Strips
-            gfx.pipeline_layout, // Lines
-            gfx.pipeline_layout, // Points
+            /* Triangle Fans   */ gfx.pipeline_layout,
+            /* Triangle Strips */ gfx.pipeline_layout,
+            /* Triangles       */ gfx.pipeline_layout,
+            /* Line Strips     */ gfx.pipeline_layout,
+            /* Lines           */ gfx.pipeline_layout,
+            /* Points          */ gfx.pipeline_layout,
         };
 
         // ----------------------------------------------------------------
 
-        const std::array<std::span<const std::byte>, num_pipelines> vtx_bytes{
-            std::as_bytes(std::span{settings.triangle_fan_vtx}),   // Triangle Fans
-            std::as_bytes(std::span{settings.triangle_strip_vtx}), // Triangle Strips
-            std::as_bytes(std::span{settings.triangle_vtx}),       // Triangles
-            std::as_bytes(std::span{settings.line_strip_vtx}),     // Line Strips
-            std::as_bytes(std::span{settings.line_vtx}),           // Lines
-            std::as_bytes(std::span{settings.point_vtx}),          // Points
+        const std::array<ByteSpan, num_pipelines> vtx_bytes{
+            /* Triangle Fans   */ std::as_bytes(std::span{settings.triangle_fan_vtx}),
+            /* Triangle Strips */ std::as_bytes(std::span{settings.triangle_strip_vtx}),
+            /* Triangles       */ std::as_bytes(std::span{settings.triangle_vtx}),
+            /* Line Strips     */ std::as_bytes(std::span{settings.line_strip_vtx}),
+            /* Lines           */ std::as_bytes(std::span{settings.line_vtx}),
+            /* Points          */ std::as_bytes(std::span{settings.point_vtx}),
         };
-        const std::array<std::span<const std::byte>, num_pipelines> idx_bytes{
+        const std::array<ByteSpan, num_pipelines> idx_bytes{
         #ifdef __APPLE__
-            {},                                                                  // Triangle Fans
+            /* Triangle Fans   */ ByteSpan{},
         #else
-            std::as_bytes(std::span{settings.triangle_fan_idx}),   // Triangle Fans
+            /* Triangle Fans   */ std::as_bytes(std::span{settings.triangle_fan_idx}),
         #endif
-            std::as_bytes(std::span{settings.triangle_strip_idx}), // Triangle Strips
-            {},                                                              // Triangles
-            std::as_bytes(std::span{settings.line_strip_idx}),     // Line Strips
-            {},                                                              // Lines
-            {},                                                              // Points
+            /* Triangle Strips */ std::as_bytes(std::span{settings.triangle_strip_idx}),
+            /* Triangles       */ ByteSpan{},
+            /* Line Strips     */ std::as_bytes(std::span{settings.line_strip_idx}),
+            /* Lines           */ ByteSpan{},
+            /* Points          */ ByteSpan{},
         };
 
         std::array<VkDeviceSize, num_pipelines> vtx_offs{};
