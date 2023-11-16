@@ -15,7 +15,7 @@ Supports Windows, Linux, and MacOS, compiled with Clang + CMake.
 
 <p align="center">
   </br>
-  <img alt="CGE-Example" src="https://github.com/SuperLuigiLinked/CGE/assets/65352263/3333a3c4-46ba-4140-9f75-a093b6768b97">
+  <img alt="CGE-Example" src="https://github.com/SuperLuigiLinked/CGE/assets/65352263/4a251db0-8e54-4270-bce9-aa7a70259244">
 </p>
 
 ## Example Code
