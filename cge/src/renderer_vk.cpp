@@ -2227,8 +2227,16 @@ namespace cge
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkQueuePresentKHR.html
         const VkResult res_present{ vkQueuePresentKHR(gfx.queue_present, &present_info) };
         
-        if (res_present == VK_ERROR_OUT_OF_DATE_KHR) return false;
-        if (res_present == VK_SUBOPTIMAL_KHR) CGE_LOG("[CGE] SUBOPTIMAL-PRESENT\n");
+        if (res_present == VK_ERROR_OUT_OF_DATE_KHR)
+        {
+            return false;
+        }
+
+        if (res_present == VK_SUBOPTIMAL_KHR)
+        {
+            CGE_LOG("[CGE] SUBOPTIMAL-PRESENT\n");
+            return false;
+        };
 
         return true;
     }
