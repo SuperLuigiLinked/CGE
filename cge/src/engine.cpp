@@ -55,6 +55,11 @@ namespace cge
         return impl->quit_flag.test(std::memory_order::relaxed);
     }
 
+    Settings& Engine::settings() noexcept
+    {
+        return impl->settings;
+    }
+
     WindowSettings& Engine::window() noexcept
     {
         return impl->win_settings;

@@ -9,6 +9,7 @@
 #include <cstdlib>
 #include <cmath>
 
+#include <numbers>
 #include <array>
 #include <vector>
 #include <string>
@@ -19,6 +20,7 @@
     #pragma clang diagnostic ignored "-Weverything"
     #pragma clang diagnostic push
     #include <fmt/core.h>
+    #include <fmt/color.h>
     #pragma clang diagnostic pop
     #define LOG(...) fmt::print(stderr, __VA_ARGS__)
 #else

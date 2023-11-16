@@ -35,16 +35,35 @@ namespace cge
 {
     static void update_loop(EngineImpl& impl)
     {
-        const wyt_duration_t frame_nanos{ static_cast<wyt_duration_t>(1'000'000'000.0 / impl.settings.fps) };
+        double fps_cache{};
+        const wyt_time_t epoch{ impl.epoch };
+        wyt_time_t last_tick{ epoch };
 
         while (!impl.engine().quitting())
         {
-            wyt_nanosleep_for(frame_nanos);
             {
                 const SemLock lock{ impl.sem_game };
                 ++impl.settings.updates;
                 impl.game.update(impl.engine());
+
+                fps_cache = impl.settings.fps;
             }
+
+            if (fps_cache > 0)
+            {
+                const wyt_time_t frame_nanos{ static_cast<wyt_time_t>(1'000'000'000.0 / fps_cache) };
+                const wyt_time_t last_nanos{ last_tick - epoch };
+                const wyt_time_t last_frame{ last_nanos / frame_nanos };
+                const wyt_time_t next_frame{ last_frame + 1 };
+                const wyt_time_t next_nanos{ next_frame * frame_nanos };
+                const wyt_time_t next_tick{ epoch + next_nanos };
+                wyt_nanosleep_until(next_tick);
+            }
+            else
+            {
+                std::this_thread::yield();
+            }
+            last_tick = wyt_nanotime();
         }
     }
 

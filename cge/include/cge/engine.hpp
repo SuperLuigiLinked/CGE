@@ -25,6 +25,7 @@ namespace cge
         void quit() noexcept;
         bool quitting() const noexcept;
 
+        Settings& settings() noexcept;
         WindowSettings& window() noexcept;
         RenderSettings& render() noexcept;
 
