@@ -2235,8 +2235,10 @@ namespace cge
         if (res_present == VK_SUBOPTIMAL_KHR)
         {
             CGE_LOG("[CGE] SUBOPTIMAL-PRESENT\n");
+        #ifndef __APPLE__
             return false;
-        };
+        #endif
+        }
 
         return true;
     }
