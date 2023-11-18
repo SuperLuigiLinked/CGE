@@ -1,5 +1,5 @@
 /**
- * @file debug.hpp
+ * @file cge/debug.hpp
  */
 
 #pragma once

@@ -1,30 +1,24 @@
 #version 450
 
-// ================================================================================================================================
-
-/// Input XYXW values.
+// Input XYXW values.
 layout(location = 0) in vec4 in_XYZW;
 
-/// Input UV values.
+// Input UV values.
 layout(location = 1) in vec2 in_UV;
 
-/// Input ST values.
+// Input ST values.
 layout(location = 2) in uvec2 in_ST;
 
-// --------------------------------------------------------------------------------------------------------------------------------
-
-/// Output RGBA values.
+// Output RGBA values.
 layout(location = 0) out vec4 out_RGBA;
 
-/// Output UV values.
+// Output UV values.
 layout(location = 1) out vec2 out_UV;
 
-/// Output T value.
+// Output T value.
 layout(location = 2) out uint out_T;
 
-// ================================================================================================================================
-
-/// Vertex Shader entry-point.
+// Vertex Shader entry-point.
 void main()
 {
     // Use only the XYZ-coordinates.
@@ -47,8 +41,6 @@ void main()
     // Pass-through the UV Values. They will be interpolated between each point.
     out_UV = in_UV;
 
-    // Pass-through the T Value. (TODO: interpolation?)
+    // Pass-through the T Value.
     out_T = t;
 }
-
-// ================================================================================================================================

@@ -27,8 +27,9 @@ int main()
 {
     App app{};
 
-    const cge::InitSettings settings
+    const cge::GameSettings settings
     {
+        .name = "CGE - Example",
         .width = 1280.0,
         .height = 720.0,
         .fps = 60.0,
@@ -46,7 +47,7 @@ int main()
 void App::update(cge::Engine engine)
 {
     [[maybe_unused]] const double secs{ engine.elapsed_seconds() };
-    cge::Settings& settings{ engine.settings() };
+    cge::GameSettings& settings{ engine.settings() };
 
     LOG(fmt::fg(fmt::color::orange), "[UPDATE] [{:.3f}] <{:.2f}> {}\n", secs, secs * settings.fps, this->updates);
     ++this->updates;
@@ -59,8 +60,7 @@ void App::update(cge::Engine engine)
 void App::render(cge::Engine engine)
 {
     [[maybe_unused]] const double secs{ engine.elapsed_seconds() };
-    cge::Settings& settings{ engine.settings() };
-    // cge::WindowSettings& window{ engine.window() };
+    cge::GameSettings& settings{ engine.settings() };
     cge::RenderSettings& render{ engine.render() };
 
     LOG(fmt::fg(fmt::color::purple), "[RENDER] [{:.3f}] <{:.2f}> {}\n", secs, secs * settings.fps, this->renders);
@@ -68,13 +68,15 @@ void App::render(cge::Engine engine)
 
     render.clear();
 
-    render.backcolor = cge::RGBA::splat(
-        1.0f - float(std::abs(((std::int64_t(this->updates) / 2) % 510) - 255)) / 255.0f,
-        1.0f - float(std::abs(((std::int64_t(this->updates)    ) % 510) - 255)) / 255.0f,
-        1.0f - float(std::abs(((std::int64_t(this->updates) * 2) % 510) - 255)) / 255.0f
+    render.backcolor(
+        cge::rgba(
+            255 - std::abs(255 - int((this->updates / 2) % 510)),
+            255 - std::abs(255 - int((this->updates    ) % 510)),
+            255 - std::abs(255 - int((this->updates * 2) % 510)),
+            255
+        )
     ); 
-
-    //render.backcolor = cge::RGBA::splat(0.0f, 0.0f, 0.25f);
+    //render.backcolor(0xFF000040);
 
     constexpr double pi{ std::numbers::pi };
     constexpr double tau{ pi + pi };

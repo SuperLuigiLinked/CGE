@@ -31,18 +31,20 @@ target_sources(cge
     PRIVATE
         "src/engine.cpp"
         "src/events.cpp"
-        "src/game.cpp"
         "src/renderer_vk.cpp"
         "src/debug.hpp"
         "src/impl.hpp"
-        "src/renderer.hpp"
+    
+    PRIVATE
+        "src/cvk/cvk.cpp"
+        "src/cvk/cvk.hpp"
 
     PRIVATE
         "src/shaders/glsl/shader.frag"
         "src/shaders/glsl/shader.vert"
 )
 if (APPLE)
-    target_sources(cge PRIVATE "src/mvk.mm" "src/mvk.hpp")
+    target_sources(cge PRIVATE "src/cvk/cvk.mm")
     target_link_libraries(cge PRIVATE "-framework QuartzCore")
 endif()
 
@@ -58,6 +60,7 @@ target_compile_options(cge
         "-Wno-switch-enum"
         "-Wno-braced-scalar-init"
         "-Wno-unsafe-buffer-usage"
+        "-Wno-cast-function-type"
         "-Wno-cast-function-type-strict"
 )
 

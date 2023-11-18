@@ -19,7 +19,7 @@ namespace cge
      * @warning MUST be called on the Main Thread.
      *          MUST NOT be called while the Engine is already running.
      */
-    void run(Game& game, const InitSettings& settings);
+    void run(Game& game, const GameSettings& settings);
 }
 
 #endif

@@ -18,15 +18,14 @@ namespace cge
         class EngineImpl* impl;
         friend class EngineImpl;
 
-        explicit inline constexpr Engine(EngineImpl* ptr) noexcept : impl{ ptr } {}
+        explicit inline constexpr Engine(EngineImpl* const ptr) noexcept : impl{ ptr } {}
         
     public:
 
         void quit() noexcept;
         bool quitting() const noexcept;
 
-        Settings& settings() noexcept;
-        WindowSettings& window() noexcept;
+        GameSettings& settings() noexcept;
         RenderSettings& render() noexcept;
 
         double elapsed_seconds() const noexcept;

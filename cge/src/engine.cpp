@@ -1,5 +1,5 @@
 /**
- * @file engine.cpp
+ * @file cge/engine.cpp
  */
 
 #include "cge/cge.hpp"
@@ -15,19 +15,11 @@ namespace cge
 
 namespace cge
 {
-    void run(Game& game, const InitSettings& settings)
+    void run(Game& game, const GameSettings& settings)
     {
         EngineImpl impl{
             .game = game,
-            .settings = {
-                .fps = settings.fps,
-                .vsync = settings.vsync,
-            },
-            .win_settings = {
-                .width = settings.width,
-                .height = settings.height,
-                .fullscreen = settings.fullscreen,
-            },
+            .game_settings = settings,
         };
         impl.renderer.reset(cge::renderer_vk());
         wyn_run(static_cast<void*>(&impl));
@@ -35,7 +27,8 @@ namespace cge
 
     void Engine::quit() noexcept
     {
-        const bool was_quitting{ impl->quit_flag.test_and_set(std::memory_order::relaxed) };
+        const bool was_quitting{ (impl->signal.fetch_or(cge::signal_quit, std::memory_order::relaxed) & cge::signal_quit) != 0 };
+        impl->signal.notify_all();
 
         if (!was_quitting)
         {
@@ -52,17 +45,12 @@ namespace cge
 
     bool Engine::quitting() const noexcept
     {
-        return impl->quit_flag.test(std::memory_order::relaxed);
+        return (impl->signal.load(std::memory_order::relaxed) & cge::signal_quit) != 0;
     }
 
-    Settings& Engine::settings() noexcept
+    GameSettings& Engine::settings() noexcept
     {
-        return impl->settings;
-    }
-
-    WindowSettings& Engine::window() noexcept
-    {
-        return impl->win_settings;
+        return impl->game_settings;
     }
 
     RenderSettings& Engine::render() noexcept
