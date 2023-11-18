@@ -64,17 +64,15 @@ void App::render([[maybe_unused]] cge::Engine& engine)
     LOG(fmt::fg(fmt::color::purple), "[RENDER] [{:.3f}] <{:.2f}> {}\n", secs, secs * settings.fps, this->renders);
     ++this->renders;
 
-    render.clear();
-
-    render.backcolor(
+    render.clear(
         cge::rgba(
             255 - std::abs(255 - int((this->updates / 2) % 510)),
             255 - std::abs(255 - int((this->updates    ) % 510)),
             255 - std::abs(255 - int((this->updates * 2) % 510)),
             255
         )
-    ); 
-    //render.backcolor(0xFF000040);
+    );
+    //render.clear(0xFF000040);
 
     constexpr double pi{ std::numbers::pi };
     constexpr double tau{ pi + pi };
@@ -94,7 +92,7 @@ void App::render([[maybe_unused]] cge::Engine& engine)
             cge::Vertex {
                 .xyzw = { std::cos((secs + 2.0 / 3.0) * tau) * rad, std::sin((secs + 2.0 / 3.0) * tau) * rad },
                 .st = { 0xFF0000FF },
-            }
+            },
         }
     );
 
@@ -112,7 +110,7 @@ void App::render([[maybe_unused]] cge::Engine& engine)
             cge::Vertex {
                 .xyzw = { -1.0f, 1.0f },
                 .st = { 0xFFFF0000 },
-            }
+            },
         }
     );
 
@@ -130,7 +128,7 @@ void App::render([[maybe_unused]] cge::Engine& engine)
             cge::Vertex {
                 .xyzw = { 1.0f, 1.0f },
                 .st = { 0xFF00FF00 },
-            }
+            },
         }
     );
 }

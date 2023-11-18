@@ -134,9 +134,9 @@ namespace cge
 
     public:
 
-        inline constexpr void clear() noexcept
+        inline constexpr void clear(const Color color = default_clr) noexcept
         {
-            self.background_clr = default_clr;
+            self.background_clr = color;
             self.point_vtx.clear();
             self.line_vtx.clear();
             self.triangle_vtx.clear();
@@ -146,11 +146,6 @@ namespace cge
             self.triangle_strip_idx.clear();
             self.triangle_fan_vtx.clear();
             self.triangle_fan_idx.clear();
-        }
-
-        inline constexpr void backcolor(const Color color) noexcept
-        {
-            self.background_clr = color;
         }
 
         inline constexpr void point(const Vertex vtx)
