@@ -21,45 +21,19 @@ Supports Windows, Linux, and MacOS, compiled with Clang + CMake.
 ## Example Code
 
 ```
-    render.clear();
+render.clear(0xFF000040);
 
-    render.backcolor = cge::RGBA::splat(0.0f, 0.0f, 0.25f);
+render.triangle(std::array{
+  cge::Vertex { .xyzw = { -1.0f, -1.0f }, .st = { 0xFFFF0000 } },
+  cge::Vertex { .xyzw = {  0.5f,  0.0f }, .st = { 0x00FF0000 } },
+  cge::Vertex { .xyzw = { -1.0f,  1.0f }, .st = { 0xFFFF0000 } },
+});
 
-    render.triangle(
-        std::array
-        {
-            cge::Vertex {
-                .xyzw = { -1.0f, -1.0f },
-                .st = { 0xFFFF0000 },
-            },
-            cge::Vertex {
-                .xyzw = { 0.5f, 0.0f },
-                .st = { 0x00FF0000 },
-            },
-            cge::Vertex {
-                .xyzw = { -1.0f, 1.0f },
-                .st = { 0xFFFF0000 },
-            }
-        }
-    );
-
-    render.triangle(
-        std::array
-        {
-            cge::Vertex {
-                .xyzw = { 1.0f, -1.0f },
-                .st = { 0xFF00FF00 },
-            },
-            cge::Vertex {
-                .xyzw = { -0.5f, 0.0f },
-                .st = { 0x0000FF00 },
-            },
-            cge::Vertex {
-                .xyzw = { 1.0f, 1.0f },
-                .st = { 0xFF00FF00 },
-            }
-        }
-    );
+render.triangle(std::array{
+  cge::Vertex { .xyzw = {  1.0f, -1.0f }, .st = { 0xFF00FF00 } },
+  cge::Vertex { .xyzw = { -0.5f,  0.0f }, .st = { 0x0000FF00 } },
+  cge::Vertex { .xyzw = {  1.0f,  1.0f }, .st = { 0xFF00FF00 } },
+});
 ```
 
 ---
