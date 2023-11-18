@@ -236,7 +236,7 @@ namespace cge
     extern bool quitting(const Engine& engine) noexcept;
 
     extern GameSettings& settings(Engine& engine) noexcept;
-    extern RenderSettings& render(Engine& engine) noexcept;
+    extern RenderSettings& renderer(Engine& engine) noexcept;
 
     extern double elapsed_seconds(const Engine& engine) noexcept;
 }

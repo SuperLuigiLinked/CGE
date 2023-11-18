@@ -52,7 +52,7 @@ namespace cge
         return engine.game_settings;
     }
 
-    RenderSettings& render(Engine& engine) noexcept
+    RenderSettings& renderer(Engine& engine) noexcept
     {
         return engine.gfx_settings;
     }
@@ -61,7 +61,6 @@ namespace cge
     {
         return double(wyt_nanotime() - engine.epoch) / 1'000'000'000.0;
     }
-
 }
 
 extern "C"

@@ -2,7 +2,7 @@
  * @file examples/example/main.cpp
  */
 
-#include <cge/cge.hpp>
+#include <cge.hpp>
 #include "../utils.hpp"
 
 // ================================================================================================================================
@@ -16,8 +16,8 @@ public:
 
 public:
 
-    void update(cge::Engine engine) final;
-    void render(cge::Engine engine) final;
+    void update(cge::Engine& engine) final;
+    void render(cge::Engine& engine) final;
 
 };
 
@@ -44,24 +44,22 @@ int main()
 
 // ================================================================================================================================
 
-void App::update(cge::Engine engine)
+void App::update([[maybe_unused]] cge::Engine& engine)
 {
-    [[maybe_unused]] const double secs{ engine.elapsed_seconds() };
-    cge::GameSettings& settings{ engine.settings() };
+    [[maybe_unused]] const double secs{ cge::elapsed_seconds(engine) };
+    [[maybe_unused]] cge::GameSettings& settings{ cge::settings(engine) };
 
     LOG(fmt::fg(fmt::color::orange), "[UPDATE] [{:.3f}] <{:.2f}> {}\n", secs, secs * settings.fps, this->updates);
     ++this->updates;
-    
-    (void)engine;
 }
 
 // ================================================================================================================================
 
-void App::render(cge::Engine engine)
+void App::render([[maybe_unused]] cge::Engine& engine)
 {
-    [[maybe_unused]] const double secs{ engine.elapsed_seconds() };
-    cge::GameSettings& settings{ engine.settings() };
-    cge::RenderSettings& render{ engine.render() };
+    [[maybe_unused]] const double secs{ cge::elapsed_seconds(engine) };
+    [[maybe_unused]] cge::GameSettings& settings{ cge::settings(engine) };
+    [[maybe_unused]] cge::RenderSettings& render{ cge::renderer(engine) };
 
     LOG(fmt::fg(fmt::color::purple), "[RENDER] [{:.3f}] <{:.2f}> {}\n", secs, secs * settings.fps, this->renders);
     ++this->renders;

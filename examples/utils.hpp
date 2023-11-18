@@ -10,10 +10,10 @@
 #include <cmath>
 
 #include <numbers>
+#include <span>
 #include <array>
 #include <vector>
 #include <string>
-#include <span>
 
 #if 1
     #include <cstdio>
