@@ -4,10 +4,6 @@
 
 #pragma once
 
-#if !defined(NDEBUG)
-    #define CGE_DEBUG_VK
-#endif
-
 #if defined(WYN_WIN32)
     #define VK_USE_PLATFORM_WIN32_KHR
 #elif defined(WYN_COCOA)
@@ -56,7 +52,7 @@ namespace cvk
     #else
         #error "Unimplemented"
     #endif
-    #if defined(CGE_DEBUG_VK)
+    #if defined(CGE_VALIDATE_VK)
         "VK_EXT_debug_utils", ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_EXT_debug_utils.html
     #endif
     };
@@ -67,7 +63,8 @@ namespace cvk
     #endif
         "VK_KHR_swapchain", ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_KHR_swapchain.html
     };
-    
+
+#if defined(CGE_VALIDATE_VK)    
     static inline constexpr std::array req_instance_layers{
         "VK_LAYER_KHRONOS_validation", ///< https://vulkan.lunarg.com/doc/view/1.3.204.1/windows/khronos_validation_layer.html
     };
@@ -75,11 +72,15 @@ namespace cvk
     static inline constexpr std::array req_device_layers{
         "VK_LAYER_KHRONOS_validation", ///< https://vulkan.lunarg.com/doc/view/1.3.204.1/windows/khronos_validation_layer.html
     };
+#else
+    static inline constexpr std::array<const char*, 0> req_instance_layers{};
+    static inline constexpr std::array<const char*, 0> req_device_layers{};
+#endif
 }
 
 namespace cvk
 {
-    using Index = std::uint32_t;
+    using Offset = std::uint32_t;
 
     static inline constexpr cge::Color default_color{};
     static inline constexpr cge::Texture default_texture{ .width = 1, .height = 1, .data = &default_color };
@@ -87,15 +88,17 @@ namespace cvk
     static inline constexpr decltype(auto) shader_entry{ "main" };
     static inline constexpr std::size_t num_pipelines{ 6 };
 
-    static inline constexpr Index null_idx{ Index(~0) };
+    static inline constexpr Offset null_idx{ Offset(~0) };
 }
 
 namespace cvk
 {
     struct Functions
     {
+    #if defined(CGE_VALIDATE_VK)
         PFN_vkCreateDebugUtilsMessengerEXT vkCreateDebugUtilsMessengerEXT; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCreateDebugUtilsMessengerEXT.html
         PFN_vkDestroyDebugUtilsMessengerEXT vkDestroyDebugUtilsMessengerEXT; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyDebugUtilsMessengerEXT.html
+    #endif
     };
     
     struct Atlas
@@ -116,20 +119,20 @@ namespace cvk
         Functions pfn;
 
         VkInstance instance; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkInstance.html
-        Index instance_extension_count;
-        Index instance_layer_count;
+        Offset instance_extension_count;
+        Offset instance_layer_count;
         std::vector<VkExtensionProperties> instance_extensions; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkExtensionProperties.html
         std::vector<VkLayerProperties> instance_layers; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkLayerProperties.html
 
-    #if defined(CGE_DEBUG_VK)
+    #if defined(CGE_VALIDATE_VK)
         VkDebugUtilsMessengerEXT messenger; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDebugUtilsMessengerEXT.html
     #endif
 
-        Index device_count;
+        Offset device_count;
         std::vector<VkPhysicalDevice> device_handles; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDevice.html
-        std::vector<Index> device_extension_counts;
-        std::vector<Index> device_layer_counts;
-        std::vector<Index> device_queue_family_counts;
+        std::vector<Offset> device_extension_counts;
+        std::vector<Offset> device_layer_counts;
+        std::vector<Offset> device_queue_family_counts;
         std::vector<std::vector<VkExtensionProperties>> device_extensions; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkExtensionProperties.html
         std::vector<std::vector<VkLayerProperties>> device_layers; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkLayerProperties.html
         std::vector<std::vector<VkQueueFamilyProperties>> device_queue_families; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkQueueFamilyProperties.html
@@ -149,12 +152,12 @@ namespace cvk
         VkDevice device; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDevice.html
         VkQueue queue_present; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkQueue.html
         VkQueue queue_graphics; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkQueue.html
-        Index device_idx;
-        Index queue_graphics_idx;
-        Index queue_present_idx;
+        Offset device_idx;
+        Offset queue_graphics_idx;
+        Offset queue_present_idx;
 
-        Index ds_mode_count;
-        Index ds_format_count;
+        Offset ds_mode_count;
+        Offset ds_format_count;
         std::vector<std::vector<VkBool32>> ds_present_supports; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkBool32.html
         std::vector<std::vector<VkPresentModeKHR>> ds_present_modes; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPresentModeKHR.html
         std::vector<std::vector<VkSurfaceFormatKHR>> ds_formats; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSurfaceFormatKHR.html
@@ -191,8 +194,8 @@ namespace cvk
 
         VkSwapchainKHR swapchain; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSwapchainKHR.html
         
-        Index num_frames;
-        Index frame_idx;
+        Offset num_frames;
+        Offset frame_idx;
         std::vector<VkFence> frame_fence; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkFence.html
         std::vector<VkSemaphore> frame_sem_render; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSemaphore.html
         std::vector<VkSemaphore> frame_sem_image; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSemaphore.html

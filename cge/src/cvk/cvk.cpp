@@ -11,26 +11,26 @@
 #include "cvk.hpp"
 
 #define CGE_LOAD_INSTANCE(handle, var, func) var.func = reinterpret_cast<PFN_##func>(vkGetInstanceProcAddr(handle, #func))
-//#define CGE_LOAD_DEVICE(handle, var, func) var.func = reinterpret_cast<PFN_##func>(vkGetDeviceProcAddr(handle, #func))
+#define CGE_LOAD_DEVICE(handle, var, func) var.func = reinterpret_cast<PFN_##func>(vkGetDeviceProcAddr(handle, #func))
 
 namespace cvk
 {
-    static std::uint64_t rank_device(Context& ctx, Renderable& gfx, cvk::Index device_idx);
-    static std::uint64_t rank_device_graphics(Context& ctx, Renderable& gfx, cvk::Index device_idx, cvk::Index queue_idx);
-    static std::uint64_t rank_device_present(Context& ctx, Renderable& gfx, cvk::Index device_idx, cvk::Index queue_idx);
+    static std::uint64_t rank_device(Context& ctx, Renderable& gfx, Offset device_idx);
+    static std::uint64_t rank_device_graphics(Context& ctx, Renderable& gfx, Offset device_idx, Offset queue_idx);
+    static std::uint64_t rank_device_present(Context& ctx, Renderable& gfx, Offset device_idx, Offset queue_idx);
 
     static std::string load_txt(const char* const filepath) noexcept;
     static void compile_spirv(const VkDevice device, VkShaderModule& module, const shaderc::Compiler& compiler, const shaderc::CompileOptions& options, const std::string& file_dir, const char* const file_name, const shaderc_shader_kind shader_kind);
 
-    static cvk::Index find_memtype(const std::span<const VkMemoryType>& mem_types, const cvk::Index alloc_type, const cvk::Index alloc_props) noexcept;
+    static Offset find_memtype(const std::span<const VkMemoryType>& mem_types, const Offset alloc_type, const Offset alloc_props) noexcept;
     static VkSurfaceFormatKHR ideal_format(const std::span<const VkSurfaceFormatKHR> formats) noexcept;
     static VkPresentModeKHR ideal_mode(const std::span<const VkPresentModeKHR> modes, const bool vsync) noexcept;
     static VkExtent2D ideal_resolution(const VkExtent2D size, const VkSurfaceCapabilitiesKHR& caps) noexcept;
 
-    static cvk::Index acquire_image(Renderable& gfx, VkSemaphore signal_sem, std::span<const VkFence> wait_fences, std::span<const VkFence> reset_fences);
-    static void record_commands(Renderable& gfx, cvk::Index frame_idx, const cge::Primitives& prims);
-    static bool submit_commands(Renderable& gfx, cvk::Index frame_idx, std::span<const VkSemaphore> wait_sems, std::span<const VkSemaphore> signal_sems, VkFence signal_fence);
-    static bool present_image(Renderable& gfx, cvk::Index frame_idx, std::span<const VkSemaphore> wait_sems);
+    static Offset acquire_image(Renderable& gfx, VkSemaphore signal_sem, std::span<const VkFence> wait_fences, std::span<const VkFence> reset_fences);
+    static void record_commands(Renderable& gfx, Offset frame_idx, const cge::Primitives& prims);
+    static bool submit_commands(Renderable& gfx, Offset frame_idx, std::span<const VkSemaphore> wait_sems, std::span<const VkSemaphore> signal_sems, VkFence signal_fence);
+    static bool present_image(Renderable& gfx, Offset frame_idx, std::span<const VkSemaphore> wait_sems);
     
 }
 
@@ -65,14 +65,14 @@ namespace cvk
         }
         CGE_ASSERT(status == shaderc_compilation_status_success);
         
-        const std::vector<cvk::Index> code{ res_compile.cbegin(), res_compile.cend() };
+        const std::vector<Offset> code{ res_compile.cbegin(), res_compile.cend() };
 
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkShaderModuleCreateInfo.html
         const VkShaderModuleCreateInfo module_info{
             .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
             .pNext = {},
             .flags = {},
-            .codeSize = code.size() * sizeof(cvk::Index),
+            .codeSize = code.size() * sizeof(Offset),
             .pCode = code.data(),
         };
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCreateShaderModule.html
@@ -98,13 +98,13 @@ namespace cvk
 
 namespace cvk
 {
-    cvk::Index find_memtype(const std::span<const VkMemoryType>& mem_types, const cvk::Index alloc_type, const cvk::Index alloc_props) noexcept
+    Offset find_memtype(const std::span<const VkMemoryType>& mem_types, const Offset alloc_type, const Offset alloc_props) noexcept
     {
-        for (cvk::Index idx{}; idx < mem_types.size(); ++idx)
+        for (Offset idx{}; idx < mem_types.size(); ++idx)
         {
             const VkMemoryType& mem_type{ mem_types[idx] };
             
-            const cvk::Index this_bit{ cvk::Index(1) << idx };
+            const Offset this_bit{ Offset(1) << idx };
             const bool has_type{ (this_bit & alloc_type) != 0 };
             const bool has_props{ (mem_type.propertyFlags & alloc_props) == alloc_props };
 
@@ -140,7 +140,7 @@ namespace cvk
     VkExtent2D ideal_resolution(const VkExtent2D size, const VkSurfaceCapabilitiesKHR& caps) noexcept
     {
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSurfaceCapabilitiesKHR.html#_description
-        constexpr cvk::Index special_value{ 0xFFFFFFFF };
+        constexpr Offset special_value{ 0xFFFFFFFF };
         
         if ((caps.currentExtent.width == special_value) && (caps.currentExtent.height == special_value)) return size;
         
@@ -151,6 +151,7 @@ namespace cvk
     }
 }
 
+#if defined(CGE_VALIDATE_VK)
 namespace cvk
 {
     static constexpr const char* msg_severity(const VkDebugUtilsMessageSeverityFlagBitsEXT val) noexcept
@@ -192,6 +193,7 @@ namespace cvk
         return VK_FALSE;
     }
 }
+#endif
 
 namespace cvk
 {
@@ -220,9 +222,9 @@ namespace cvk
                 .flags = {},
             #endif
                 .pApplicationInfo = &app_info,
-                .enabledLayerCount = cvk::Index(req_instance_layers.size()),
+                .enabledLayerCount = Offset(req_instance_layers.size()),
                 .ppEnabledLayerNames = req_instance_layers.data(),
-                .enabledExtensionCount = cvk::Index(req_instance_extensions.size()),
+                .enabledExtensionCount = Offset(req_instance_extensions.size()),
                 .ppEnabledExtensionNames = req_instance_extensions.data(),
             };
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCreateInstance.html
@@ -249,12 +251,14 @@ namespace cvk
             CGE_LOG("[CGE] VK INSTANCE PROPERTIES\n");
         }
         {
+        #if defined(CGE_VALIDATE_VK)
             CGE_ASSERT((CGE_LOAD_INSTANCE(ctx.instance, ctx.pfn, vkCreateDebugUtilsMessengerEXT)));
             CGE_ASSERT((CGE_LOAD_INSTANCE(ctx.instance, ctx.pfn, vkDestroyDebugUtilsMessengerEXT)));
+        #endif
 
             CGE_LOG("[CGE] VK INSTANCE FUNCTIONS\n");
         }
-        #if defined(CGE_DEBUG_VK)
+        #if defined(CGE_VALIDATE_VK)
         {
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDebugUtilsMessengerCreateInfoEXT.html
             const VkDebugUtilsMessengerCreateInfoEXT create_info{
@@ -295,12 +299,12 @@ namespace cvk
         {
             CGE_ASSERT(ctx.device_count > 0);
 
-            for (cvk::Index idx{}; idx < ctx.device_count; ++idx)
+            for (Offset idx{}; idx < ctx.device_count; ++idx)
             {
                 VkPhysicalDevice& handle{ ctx.device_handles[idx] };
-                cvk::Index& extension_count{ ctx.device_extension_counts[idx] };
-                cvk::Index& layer_count{ ctx.device_layer_counts[idx] };
-                cvk::Index& queue_family_count{ ctx.device_queue_family_counts[idx] };
+                Offset& extension_count{ ctx.device_extension_counts[idx] };
+                Offset& layer_count{ ctx.device_layer_counts[idx] };
+                Offset& queue_family_count{ ctx.device_queue_family_counts[idx] };
                 std::vector<VkExtensionProperties>& extensions{ ctx.device_extensions[idx] };
                 std::vector<VkLayerProperties>& layers{ ctx.device_layers[idx] };
                 std::vector<VkQueueFamilyProperties>& queue_families{ ctx.device_queue_families[idx] };
@@ -344,7 +348,7 @@ namespace cvk
 
     void destroy_context(Context& ctx)
     {
-    #if defined(CGE_DEBUG_VK)
+    #if defined(CGE_VALIDATE_VK)
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyDebugUtilsMessengerEXT.html
         ctx.pfn.vkDestroyDebugUtilsMessengerEXT(ctx.instance, ctx.messenger, nullptr);
     #endif
@@ -437,15 +441,15 @@ namespace cvk
             CGE_LOG("[CGE] VK DEVICE SURFACE\n");
         }
         {
-            cvk::Index device_idx{};
-            cvk::Index graphics_idx{};
-            cvk::Index present_idx{};
+            Offset device_idx{};
+            Offset graphics_idx{};
+            Offset present_idx{};
             std::uint64_t device_rank{};
             std::uint64_t graphics_rank{};
             std::uint64_t present_rank{};
 
-            const cvk::Index device_count{ ctx.device_count };
-            for (cvk::Index di{}; di < device_count; ++di)
+            const Offset device_count{ ctx.device_count };
+            for (Offset di{}; di < device_count; ++di)
             {
                 const uint64_t rank_d{ rank_device(ctx, gfx, di) };
                 {
@@ -462,8 +466,8 @@ namespace cvk
                     present_idx = 0;
                     present_rank = 0;
 
-                    const cvk::Index queue_count{ ctx.device_queue_family_counts[di] };
-                    for (cvk::Index qi{}; qi < queue_count; ++qi)
+                    const Offset queue_count{ ctx.device_queue_family_counts[di] };
+                    for (Offset qi{}; qi < queue_count; ++qi)
                     {
                         const std::uint64_t rank_g{ rank_device_graphics(ctx, gfx, di, qi) };
                         if (rank_g > graphics_rank)
@@ -519,8 +523,8 @@ namespace cvk
             static constexpr VkPhysicalDeviceFeatures features{};
 
             const bool queues_unique{ gfx.queue_graphics_idx != gfx.queue_present_idx };
-            const cvk::Index queue_unique_count{ static_cast<cvk::Index>(queues_unique ? 2 : 1) };
-            //const cvk::Index queue_concurrent_count{ static_cast<cvk::Index>(queues_unique ? 2 : 0) };
+            const Offset queue_unique_count{ static_cast<Offset>(queues_unique ? 2 : 1) };
+            //const Offset queue_concurrent_count{ static_cast<Offset>(queues_unique ? 2 : 0) };
             //const std::array queue_indices{ gfx.queue_graphics_idx, gfx.queue_present_idx };
             //const VkSharingMode queue_sharing{ queues_unique ? VK_SHARING_MODE_CONCURRENT : VK_SHARING_MODE_EXCLUSIVE };
 
@@ -605,12 +609,12 @@ namespace cvk
         }
         {
             const VkDeviceSize alloc_size{ gfx.memreqs_vtx.size + gfx.memreqs_idx.size + gfx.memreqs_stg.size };
-            const cvk::Index alloc_type{ gfx.memreqs_vtx.memoryTypeBits & gfx.memreqs_idx.memoryTypeBits & gfx.memreqs_stg.memoryTypeBits };
+            const Offset alloc_type{ gfx.memreqs_vtx.memoryTypeBits & gfx.memreqs_idx.memoryTypeBits & gfx.memreqs_stg.memoryTypeBits };
             constexpr VkMemoryPropertyFlags alloc_props{ VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT };
             
             const VkPhysicalDeviceMemoryProperties& mem_props{ ctx.device_memory[gfx.device_idx] };
             const std::span<const VkMemoryType> mem_types{ mem_props.memoryTypes, mem_props.memoryTypeCount };
-            const cvk::Index mem_idx{ cvk::find_memtype(mem_types, alloc_type, alloc_props) };
+            const Offset mem_idx{ cvk::find_memtype(mem_types, alloc_type, alloc_props) };
             CGE_ASSERT(mem_idx != null_idx);
 
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkMemoryAllocateInfo.html
@@ -725,7 +729,7 @@ namespace cvk
             CGE_LOG("[CGE] VK RENDER PASS\n");
         }
         {
-            constexpr cvk::Index max_frames{ 1 };
+            constexpr Offset max_frames{ 1 };
 
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDescriptorSetLayoutBinding.html
             const VkDescriptorSetLayoutBinding sampler_binding{
@@ -843,7 +847,7 @@ namespace cvk
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkVertexInputBindingDescription.html
             constexpr VkVertexInputBindingDescription binding_vertex{
                 .binding = 0,
-                .stride = cvk::Index(sizeof(cge::Vertex)),
+                .stride = Offset(sizeof(cge::Vertex)),
                 .inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
             };
             constexpr std::array bindings{ binding_vertex };
@@ -859,13 +863,13 @@ namespace cvk
                 .location = 1,
                 .binding = binding_vertex.binding,
                 .format = VK_FORMAT_R32G32_SFLOAT,
-                .offset = cvk::Index(attribute_xyzw.offset + sizeof(cge::vec4)),
+                .offset = Offset(attribute_xyzw.offset + sizeof(cge::vec4)),
             };
             constexpr VkVertexInputAttributeDescription attribute_st{
                 .location = 2,
                 .binding = binding_vertex.binding,
                 .format = VK_FORMAT_R32G32_UINT,
-                .offset = cvk::Index(attribute_uv.offset + sizeof(cge::vec2)),
+                .offset = Offset(attribute_uv.offset + sizeof(cge::vec2)),
             };
             constexpr std::array attributes{ attribute_xyzw, attribute_uv, attribute_st };
 
@@ -881,7 +885,7 @@ namespace cvk
             };
 
             const wyn_size_t wyn_size{ wyn_window_size(window) };
-            gfx.surface_size = { .width = cvk::Index(wyn_size.w), .height = cvk::Index(wyn_size.h) };
+            gfx.surface_size = { .width = Offset(wyn_size.w), .height = Offset(wyn_size.h) };
 
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkExtent2D.html
             const VkExtent2D ideal_res{ cvk::ideal_resolution(gfx.surface_size, gfx.ds_capabilities[gfx.device_idx]) };
@@ -1078,7 +1082,7 @@ namespace cvk
         (void)res_wait;
 
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkFreeCommandBuffers.html
-        vkFreeCommandBuffers(gfx.device, gfx.command_pool, cvk::Index(gfx.frame_commands.size()), gfx.frame_commands.data());
+        vkFreeCommandBuffers(gfx.device, gfx.command_pool, Offset(gfx.frame_commands.size()), gfx.frame_commands.data());
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyFramebuffer.html
         for (const VkFramebuffer buffer : gfx.frame_buffers) vkDestroyFramebuffer(gfx.device, buffer, nullptr);
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyImageView.html
@@ -1181,7 +1185,7 @@ namespace cvk
         {
             const VkPhysicalDeviceMemoryProperties& mem_props{ ctx.device_memory[gfx.device_idx] };
             const std::span<const VkMemoryType> mem_types{ mem_props.memoryTypes, mem_props.memoryTypeCount };
-            const cvk::Index mem_idx{ cvk::find_memtype(mem_types, atlas.memreqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) };
+            const Offset mem_idx{ cvk::find_memtype(mem_types, atlas.memreqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) };
             CGE_ASSERT(mem_idx != null_idx);
 
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkMemoryAllocateInfo.html
@@ -1455,7 +1459,7 @@ namespace cvk
             const std::array<VkCopyDescriptorSet, 0> copies{};
 
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkUpdateDescriptorSets.html
-            vkUpdateDescriptorSets(gfx.device, cvk::Index(writes.size()), writes.data(), cvk::Index(copies.size()), copies.data());
+            vkUpdateDescriptorSets(gfx.device, Offset(writes.size()), writes.data(), Offset(copies.size()), copies.data());
         };
 
         transition_atlas(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
@@ -1502,7 +1506,7 @@ namespace cvk
         return true;
     }
 
-    std::uint64_t rank_device(Context& ctx, Renderable& gfx, cvk::Index device_idx)
+    std::uint64_t rank_device(Context& ctx, Renderable& gfx, Offset device_idx)
     {
         const VkPhysicalDeviceProperties& device_props{ ctx.device_properties[device_idx] };
         const std::span<const VkExtensionProperties> device_exts{ ctx.device_extensions[device_idx] };
@@ -1528,7 +1532,7 @@ namespace cvk
         return rank;
     }
 
-    std::uint64_t rank_device_graphics(Context& ctx, [[maybe_unused]] Renderable& gfx, cvk::Index device_idx, cvk::Index queue_idx)
+    std::uint64_t rank_device_graphics(Context& ctx, [[maybe_unused]] Renderable& gfx, Offset device_idx, Offset queue_idx)
     {
         const VkQueueFamilyProperties& qf_props{ ctx.device_queue_families[device_idx][queue_idx] };
 
@@ -1541,7 +1545,7 @@ namespace cvk
         return rank;
     }
 
-    std::uint64_t rank_device_present(Context& ctx, Renderable& gfx, cvk::Index device_idx, cvk::Index queue_idx)
+    std::uint64_t rank_device_present(Context& ctx, Renderable& gfx, Offset device_idx, Offset queue_idx)
     {
         const VkQueueFamilyProperties& qf_props{ ctx.device_queue_families[device_idx][queue_idx] };
         const VkBool32 supports_present{ gfx.ds_present_supports[device_idx][queue_idx] };
@@ -1560,8 +1564,8 @@ namespace cvk
 {
     bool render_frame(Renderable& gfx, const cge::Primitives& prims, const unsigned attempts)
     {
-        const cvk::Index this_frame{ gfx.frame_idx };
-        const cvk::Index prev_frame{ (this_frame + (gfx.num_frames - 1)) % gfx.num_frames };
+        const Offset this_frame{ gfx.frame_idx };
+        const Offset prev_frame{ (this_frame + (gfx.num_frames - 1)) % gfx.num_frames };
 
         const VkSemaphore image_acquired{ gfx.frame_sem_image[this_frame] };
         const VkSemaphore render_finished{ gfx.frame_sem_render[this_frame] };
@@ -1570,7 +1574,7 @@ namespace cvk
 
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkQueuePresentKHR.html
 
-        const cvk::Index image_idx{ acquire_image(gfx, image_acquired, std::array{ this_available, prev_available }, std::array{ this_available }) };
+        const Offset image_idx{ acquire_image(gfx, image_acquired, std::array{ this_available, prev_available }, std::array{ this_available }) };
         if (image_idx == null_idx)
         {
             CGE_LOG("[CGE] Render {} failed. (Could not acquire image)\n", attempts);
@@ -1601,28 +1605,28 @@ namespace cvk
         return true;
     }
 
-    cvk::Index acquire_image(Renderable& gfx, const VkSemaphore signal_sem, const std::span<const VkFence> wait_fences, const std::span<const VkFence> reset_fences)
+    Offset acquire_image(Renderable& gfx, const VkSemaphore signal_sem, const std::span<const VkFence> wait_fences, const std::span<const VkFence> reset_fences)
     {
         constexpr std::uint64_t no_timeout{ std::uint64_t(~0) };
 
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkWaitForFences.html
-        const VkResult res_wait{ vkWaitForFences(gfx.device, cvk::Index(wait_fences.size()), wait_fences.data(), VK_TRUE, no_timeout) };
+        const VkResult res_wait{ vkWaitForFences(gfx.device, Offset(wait_fences.size()), wait_fences.data(), VK_TRUE, no_timeout) };
         CGE_ASSERT(res_wait == VK_SUCCESS);
 
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkAcquireNextImageKHR.html
-        cvk::Index image_idx{};
+        Offset image_idx{};
         const VkResult res_acquire{ vkAcquireNextImageKHR(gfx.device, gfx.swapchain, no_timeout, signal_sem, VK_NULL_HANDLE, &image_idx) };
         
         if (res_acquire == VK_ERROR_OUT_OF_DATE_KHR) return null_idx;
 
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkResetFences.html
-        const VkResult res_reset{ vkResetFences(gfx.device, cvk::Index(reset_fences.size()), reset_fences.data()) };
+        const VkResult res_reset{ vkResetFences(gfx.device, Offset(reset_fences.size()), reset_fences.data()) };
         CGE_ASSERT(res_reset == VK_SUCCESS);
 
         return image_idx;
     }
 
-    void record_commands(Renderable& gfx, const cvk::Index frame_idx, const cge::Primitives& prims)
+    void record_commands(Renderable& gfx, const Offset frame_idx, const cge::Primitives& prims)
     {
         // ----------------------------------------------------------------
 
@@ -1840,8 +1844,8 @@ namespace cvk
                     const VkDeviceSize idx_offset{ idx_offs[idx] - gfx.buffer_idx_offs };
                     const VkDescriptorSet desc_set{ descriptor_sets[idx] };
                     const VkPipelineLayout layout{ pipeline_layouts[idx] };
-                    const cvk::Index vtx_count{ cvk::Index(vertices[idx].size()) };
-                    const cvk::Index idx_count{ cvk::Index(indices[idx].size()) };
+                    const Offset vtx_count{ Offset(vertices[idx].size()) };
+                    const Offset idx_count{ Offset(indices[idx].size()) };
                     const bool has_idx{ indices[idx].data() != nullptr };
 
                     vkCmdBindVertexBuffers(command_buffer, 0, 1, &gfx.buffer_vtx, &vtx_offset);
@@ -1868,7 +1872,7 @@ namespace cvk
         // ----------------------------------------------------------------
     }
 
-    bool submit_commands(Renderable& gfx, const cvk::Index frame_idx, const std::span<const VkSemaphore> wait_sems, const std::span<const VkSemaphore> signal_sems, const VkFence signal_fence)
+    bool submit_commands(Renderable& gfx, const Offset frame_idx, const std::span<const VkSemaphore> wait_sems, const std::span<const VkSemaphore> signal_sems, const VkFence signal_fence)
     {
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPipelineStageFlags.html
         constexpr VkPipelineStageFlags stage_mask{ VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
@@ -1877,12 +1881,12 @@ namespace cvk
         const VkSubmitInfo submit_info{
             .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
             .pNext = {},
-            .waitSemaphoreCount = cvk::Index(wait_sems.size()),
+            .waitSemaphoreCount = Offset(wait_sems.size()),
             .pWaitSemaphores = wait_sems.data(),
             .pWaitDstStageMask = &stage_mask,
             .commandBufferCount = 1,
             .pCommandBuffers = &gfx.frame_commands[frame_idx],
-            .signalSemaphoreCount = cvk::Index(signal_sems.size()),
+            .signalSemaphoreCount = Offset(signal_sems.size()),
             .pSignalSemaphores = signal_sems.data(),
         };
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkQueueSubmit.html
@@ -1893,20 +1897,20 @@ namespace cvk
         return true;
     }
 
-    bool present_image(Renderable& gfx, const cvk::Index frame_idx, const std::span<const VkSemaphore> wait_sems)
+    bool present_image(Renderable& gfx, const Offset frame_idx, const std::span<const VkSemaphore> wait_sems)
     {
-        constexpr cvk::Index num_swapchains{ 1 };
+        constexpr Offset num_swapchains{ 1 };
         const std::array<VkSwapchainKHR, num_swapchains> swapchains{ gfx.swapchain };
-        const std::array<cvk::Index, num_swapchains> indices{ frame_idx };
+        const std::array<Offset, num_swapchains> indices{ frame_idx };
         std::array<VkResult, num_swapchains> results{};
 
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPresentInfoKHR.html
         const VkPresentInfoKHR present_info{
             .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
             .pNext = {},
-            .waitSemaphoreCount = cvk::Index(wait_sems.size()),
+            .waitSemaphoreCount = Offset(wait_sems.size()),
             .pWaitSemaphores = wait_sems.data(),
-            .swapchainCount = cvk::Index(swapchains.size()),
+            .swapchainCount = Offset(swapchains.size()),
             .pSwapchains = swapchains.data(),
             .pImageIndices = indices.data(),
             .pResults = results.data(),
@@ -1935,13 +1939,13 @@ namespace cvk
 {
     void update_surface_info(Context& ctx, Renderable& gfx)
     {
-        const cvk::Index device_count{  ctx.device_count };
+        const Offset device_count{  ctx.device_count };
         gfx.ds_present_supports.resize(device_count);
         gfx.ds_present_modes.resize(device_count);
         gfx.ds_formats.resize(device_count);
         gfx.ds_capabilities.resize(device_count);
         
-        for (cvk::Index di{}; di < device_count; ++di)
+        for (Offset di{}; di < device_count; ++di)
         {
             VkPhysicalDevice& device{ ctx.device_handles[di] };
             VkSurfaceKHR& surface{ gfx.surface_handle };
@@ -1949,13 +1953,13 @@ namespace cvk
             std::vector<VkPresentModeKHR>& present_modes{ gfx.ds_present_modes[di] };
             std::vector<VkSurfaceFormatKHR>& formats{ gfx.ds_formats[di] };
             VkSurfaceCapabilitiesKHR& capabilities{ gfx.ds_capabilities[di] };
-            cvk::Index& mode_count{ gfx.ds_mode_count };
-            cvk::Index& format_count{ gfx.ds_format_count };
+            Offset& mode_count{ gfx.ds_mode_count };
+            Offset& format_count{ gfx.ds_format_count };
 
-            const cvk::Index queue_count{ ctx.device_queue_family_counts[di] };
+            const Offset queue_count{ ctx.device_queue_family_counts[di] };
             present_supports.resize(queue_count);
 
-            for (cvk::Index qi{}; qi < queue_count; ++qi)
+            for (Offset qi{}; qi < queue_count; ++qi)
             {
                 // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceSurfaceSupportKHR.html
                 const VkResult res_support{ vkGetPhysicalDeviceSurfaceSupportKHR(device, qi, surface, &present_supports[qi]) };
@@ -1997,15 +2001,15 @@ namespace cvk
         const VkPresentModeKHR best_present{ cvk::ideal_mode(ds_modes, vsync) };
 
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSurfaceCapabilitiesKHR.html#_description
-        const cvk::Index min_images{ ds_caps.minImageCount };
-        const cvk::Index max_images{ ds_caps.maxImageCount };
-        const cvk::Index req_images{ min_images + 1};
-        const cvk::Index num_images{ (max_images == 0) ? req_images : std::min(req_images, max_images) };
+        const Offset min_images{ ds_caps.minImageCount };
+        const Offset max_images{ ds_caps.maxImageCount };
+        const Offset req_images{ min_images + 1};
+        const Offset num_images{ (max_images == 0) ? req_images : std::min(req_images, max_images) };
 
         const bool queues_unique{ gfx.queue_graphics_idx != gfx.queue_present_idx };
-        const cvk::Index queue_concurrent_count{ static_cast<cvk::Index>(queues_unique ? 2 : 0) };
+        const Offset queue_concurrent_count{ static_cast<Offset>(queues_unique ? 2 : 0) };
         const std::array queue_indices{ gfx.queue_graphics_idx, gfx.queue_present_idx };
-        const cvk::Index* queue_indices_ptr{ queues_unique ? queue_indices.data() : nullptr };
+        const Offset* queue_indices_ptr{ queues_unique ? queue_indices.data() : nullptr };
         const VkSharingMode queue_sharing{ queues_unique ? VK_SHARING_MODE_CONCURRENT : VK_SHARING_MODE_EXCLUSIVE };
 
         {
@@ -2041,7 +2045,7 @@ namespace cvk
             CGE_ASSERT(res_wait == VK_SUCCESS);
 
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkFreeCommandBuffers.html
-            vkFreeCommandBuffers(gfx.device, gfx.command_pool, cvk::Index(gfx.frame_commands.size()), gfx.frame_commands.data());
+            vkFreeCommandBuffers(gfx.device, gfx.command_pool, Offset(gfx.frame_commands.size()), gfx.frame_commands.data());
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyFramebuffer.html
             for (const VkFramebuffer buffer : gfx.frame_buffers) vkDestroyFramebuffer(gfx.device, buffer, nullptr);
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyImageView.html
@@ -2071,7 +2075,7 @@ namespace cvk
             const VkResult res_images{ vkGetSwapchainImagesKHR(gfx.device, gfx.swapchain, &gfx.num_frames, gfx.frame_images.data()) };
             CGE_ASSERT(res_images == VK_SUCCESS);
 
-            for (cvk::Index idx{}; idx < gfx.num_frames; ++idx)
+            for (Offset idx{}; idx < gfx.num_frames; ++idx)
             {
                 // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkFenceCreateInfo.html
                 constexpr VkFenceCreateInfo fence_info{

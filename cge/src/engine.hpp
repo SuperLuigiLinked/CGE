@@ -41,9 +41,7 @@ namespace cge
     {
     public:
         virtual ~Renderer() = default;
-
         virtual void target_window(Engine& engine, wyn_window_t window);
-
         virtual void render(Engine& engine);
     };
 
@@ -79,16 +77,15 @@ namespace cge
         GameSettings game_settings;
         RenderSettings gfx_settings;
         
-        double cached_fps;
-        bool cached_vsync;
-
         wyt_time_t epoch;
         wyn_window_t window;
         wyt_thread_t update_thread;
         wyt_thread_t render_thread;
 
         std::unique_ptr<Renderer> renderer;
-
+        double cached_fps;
+        bool cached_vsync;
+        
         std::atomic<Signal> signal;
     
     };

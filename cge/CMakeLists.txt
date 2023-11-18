@@ -3,6 +3,7 @@
 # ================================================================================================================================
 
 set(CGE_DEBUG ON CACHE BOOL "Enables internal debug logging.")
+set(CGE_VALIDATE_VK OFF CACHE BOOL "Enables Vulkan Validation.")
 
 # ================================================================================================================================
 
@@ -17,6 +18,10 @@ endif()
 if (CGE_DEBUG)
     target_link_libraries(cge PRIVATE fmt::fmt)
     target_compile_definitions(cge PRIVATE "CGE_DEBUG")
+endif()
+
+if (CGE_VALIDATE_VK)
+    target_compile_definitions(cge PRIVATE "CGE_VALIDATE_VK")
 endif()
 
 target_include_directories(cge PUBLIC "include/")
@@ -57,6 +62,7 @@ target_compile_options(cge
         "-Wno-unsafe-buffer-usage"
         "-Wno-cast-function-type"
         "-Wno-cast-function-type-strict"
+        "-Wno-unused-macros"
 )
 
 # ================================================================================================================================

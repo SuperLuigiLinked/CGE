@@ -140,7 +140,7 @@ extern "C"
            // wyn_window_resize(engine.window, { engine.game_settings.width, engine.game_settings.height });
         }
 
-        engine.signal.store(signal & cge::signal_quit, std::memory_order::release);
+        (void)engine.signal.fetch_and(~signal, std::memory_order::release);
         engine.signal.notify_all();
     }
 
