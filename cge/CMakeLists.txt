@@ -3,7 +3,7 @@
 # ================================================================================================================================
 
 set(CGE_DEBUG ON CACHE BOOL "Enables internal debug logging.")
-set(CGE_VALIDATE_VK OFF CACHE BOOL "Enables Vulkan Validation.")
+set(CGE_VALIDATE_VK ON CACHE BOOL "Enables Vulkan Validation.")
 
 # ================================================================================================================================
 
