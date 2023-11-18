@@ -31,13 +31,9 @@
 #endif
 #include <shaderc/shaderc.hpp>
 
-#include "cge/cge.hpp"
-#include "../impl.hpp"
-#include "../debug.hpp"
+#include <cge.hpp>
+#include "../engine.hpp"
 
-#include <cstddef>
-#include <cstdint>
-#include <array>
 
 namespace cvk
 {

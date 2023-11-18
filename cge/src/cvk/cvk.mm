@@ -4,10 +4,10 @@
 
 #if defined(WYN_COCOA)
 
-#include "cvk.hpp"
 #import <Cocoa/Cocoa.h>
 #import <QuartzCore/CAMetalLayer.h>
-// #include <vulkan/vulkan_metal.h>
+
+#include "cvk.hpp"
 
 namespace cvk
 {

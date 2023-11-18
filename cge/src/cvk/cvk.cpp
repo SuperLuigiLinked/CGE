@@ -4,13 +4,9 @@
 
 #include <cstring>
 
-#include <fstream>
-#include <filesystem>
 #include <algorithm>
-#include <optional>
-#include <array>
-#include <vector>
-#include <span>
+#include <filesystem>
+#include <fstream>
 
 #include "cvk.hpp"
 

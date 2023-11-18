@@ -23,25 +23,20 @@ target_include_directories(cge PUBLIC "include/")
 
 target_sources(cge
     PUBLIC
-        "include/cge/cge.hpp"
-        "include/cge/engine.hpp"
-        "include/cge/settings.hpp"
-        "include/cge/types.hpp"
- 
+        "include/cge.hpp"
+        
     PRIVATE
+        "src/engine.hpp"
         "src/engine.cpp"
-        "src/events.cpp"
         "src/renderer_vk.cpp"
-        "src/debug.hpp"
-        "src/impl.hpp"
     
     PRIVATE
-        "src/cvk/cvk.cpp"
         "src/cvk/cvk.hpp"
+        "src/cvk/cvk.cpp"
 
     PRIVATE
-        "src/shaders/glsl/shader.frag"
         "src/shaders/glsl/shader.vert"
+        "src/shaders/glsl/shader.frag"
 )
 if (APPLE)
     target_sources(cge PRIVATE "src/cvk/cvk.mm")
