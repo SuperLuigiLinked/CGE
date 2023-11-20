@@ -11,9 +11,7 @@ namespace cge
     {
     private:
 
-        cvk::Context context;
-        cvk::Renderable renderable;
-        cvk::Atlas atlas;
+        cvk::Vulkan self;
 
     public:
 
@@ -30,9 +28,8 @@ namespace cge
 {
     Renderer_VK::~Renderer_VK()
     {
-        cvk::destroy_atlas(this->context, this->renderable, this->atlas);
-        cvk::destroy_renderable(this->context, this->renderable);
-        cvk::destroy_context(this->context);
+        cvk::destroy_renderable(self.ctx, self.gfx);
+        cvk::destroy_context(self.ctx);
     }
 
     extern Renderer* renderer_vk()
@@ -45,45 +42,37 @@ namespace cge
 {
     void Renderer_VK::target_window(Engine& engine, wyn_window_t const window)
     {
-        if (this->context.instance == nullptr)
+        if (self.ctx.instance == nullptr)
         {
-            this->context = cvk::create_context();
+            cvk::create_context(self.ctx);
         }
 
-        if (this->renderable.window != nullptr)
+        if (self.gfx.window != nullptr)
         {
-            cvk::destroy_renderable(this->context, this->renderable);
-            this->renderable = cvk::Renderable{};
+            cvk::destroy_renderable(self.ctx, self.gfx);
         }
 
         if (window)
         {
-            this->renderable = cvk::create_renderable(this->context, wyn_window_t(window), engine.game_settings.vsync);
-            
-            this->atlas = cvk::create_atlas(this->context, this->renderable, cvk::default_texture);
-            
-            cvk::upload_atlas(this->context, this->renderable, this->atlas);
+            cvk::create_renderable(self.ctx, self.gfx, window, engine.game_settings.vsync);
+            cvk::upload_texture(self.ctx, self.gfx, 0, cvk::default_texture);
         }
     }
 
     void Renderer_VK::render(Engine& engine)
     {
-        for (unsigned attempts{}; ; ++attempts)
+        for (unsigned attempts{}; attempts < 10; ++attempts)
         {
-            const bool res_render{ cvk::render_frame(this->renderable, engine.primitives(), attempts) };
-            if (res_render) break;
+            const bool res_render{ cvk::render_frame(self.ctx, self.gfx, engine.primitives(), attempts) };
+            if (res_render) return;
 
             if (cge::quitting(engine)) return;
 
-            if (attempts > 10)
-            {
-                CGE_LOG("[CGE] Renderer aborting...\n");
-                return;
-            }
-            cvk::update_surface_info(this->context, this->renderable);
-            cvk::remake_swapchain(this->renderable, engine.cached_vsync);
+            cvk::update_surface_info(self.ctx, self.gfx);
+            cvk::remake_swapchain(self.ctx, self.gfx, engine.cached_vsync);
 
-            if ((this->renderable.surface_size.width == 0) || (this->renderable.surface_size.height == 0)) return;
+            // if ((self.surface_size.width == 0) || (self.surface_size.height == 0)) return;
         }
+        CGE_LOG("[CGE] RENDER ABORTING...\n");
     }
 }

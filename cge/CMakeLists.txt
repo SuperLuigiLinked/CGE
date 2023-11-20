@@ -31,6 +31,7 @@ target_sources(cge
         "include/cge.hpp"
         
     PRIVATE
+        "src/soa.hpp"
         "src/engine.hpp"
         "src/engine.cpp"
         "src/renderer_vk.cpp"

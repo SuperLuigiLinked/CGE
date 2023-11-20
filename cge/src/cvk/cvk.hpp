@@ -29,7 +29,28 @@
 
 #include <cge.hpp>
 #include "../engine.hpp"
+#include "../soa.hpp"
 
+// https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetInstanceProcAddr.html
+#define CVK_LOAD_INSTANCE(instance, var, func) var.func = reinterpret_cast<PFN_##func>(vkGetInstanceProcAddr(instance, #func))
+
+// https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetDeviceProcAddr.html
+#define CVK_LOAD_DEVICE(device, var, func) var.func = reinterpret_cast<PFN_##func>(vkGetDeviceProcAddr(device, #func))
+
+namespace cvk
+{
+    struct InstanceFunctions
+    {
+    #if defined(CGE_VALIDATE_VK)
+        PFN_vkCreateDebugUtilsMessengerEXT vkCreateDebugUtilsMessengerEXT; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCreateDebugUtilsMessengerEXT.html
+        PFN_vkDestroyDebugUtilsMessengerEXT vkDestroyDebugUtilsMessengerEXT; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyDebugUtilsMessengerEXT.html
+    #endif
+    };
+
+    struct DeviceFunctions
+    {
+    };
+}
 
 namespace cvk
 {
@@ -88,141 +109,128 @@ namespace cvk
     static inline constexpr decltype(auto) shader_entry{ "main" };
     static inline constexpr std::size_t num_pipelines{ 6 };
 
-    static inline constexpr Offset null_idx{ Offset(~0) };
+    static inline constexpr Offset null_idx{ ~Offset{} };
 }
 
 namespace cvk
 {
-    struct Functions
-    {
-    #if defined(CGE_VALIDATE_VK)
-        PFN_vkCreateDebugUtilsMessengerEXT vkCreateDebugUtilsMessengerEXT; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCreateDebugUtilsMessengerEXT.html
-        PFN_vkDestroyDebugUtilsMessengerEXT vkDestroyDebugUtilsMessengerEXT; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyDebugUtilsMessengerEXT.html
-    #endif
-    };
-    
-    struct Atlas
-    {
-        cge::Texture tex;
-
-        VkImage image; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkImage.html
-        VkMemoryRequirements memreqs; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkMemoryRequirements
-
-        VkDeviceMemory memory; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDeviceMemory.html
-
-        VkImageView view; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkImageView.html
-        VkSampler sampler; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSampler.html
-    };
-
     struct Context
     {
-        Functions pfn;
+        InstanceFunctions pfn;
 
-        VkInstance instance; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkInstance.html
-        Offset instance_extension_count;
-        Offset instance_layer_count;
-        std::vector<VkExtensionProperties> instance_extensions; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkExtensionProperties.html
-        std::vector<VkLayerProperties> instance_layers; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkLayerProperties.html
+        VkInstance             instance          ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkInstance.html
+        Offset                 instance_ext_count;
+        Offset                 instance_lyr_count;
+        VkExtensionProperties* instance_ext_array; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkExtensionProperties.html
+        VkLayerProperties*     instance_lyr_array; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkLayerProperties.html
 
     #if defined(CGE_VALIDATE_VK)
         VkDebugUtilsMessengerEXT messenger; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDebugUtilsMessengerEXT.html
     #endif
 
         Offset device_count;
-        std::vector<VkPhysicalDevice> device_handles; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDevice.html
-        std::vector<Offset> device_extension_counts;
-        std::vector<Offset> device_layer_counts;
-        std::vector<Offset> device_queue_family_counts;
-        std::vector<std::vector<VkExtensionProperties>> device_extensions; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkExtensionProperties.html
-        std::vector<std::vector<VkLayerProperties>> device_layers; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkLayerProperties.html
-        std::vector<std::vector<VkQueueFamilyProperties>> device_queue_families; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkQueueFamilyProperties.html
-        std::vector<VkPhysicalDeviceProperties> device_properties; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceProperties
-        std::vector<VkPhysicalDeviceFeatures> device_features; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceFeatures.html
-        std::vector<VkPhysicalDeviceMemoryProperties> device_memory; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceMemoryProperties.html
+        void*  device_array;
+        VkPhysicalDevice*                 devices          ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDevice.html
+        Offset*                           device_ext_count ;
+        Offset*                           device_lyr_count ;
+        Offset*                           device_fam_count ;
+        VkExtensionProperties**           device_ext_array ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkExtensionProperties.html
+        VkLayerProperties**               device_lyr_array ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkLayerProperties.html
+        VkQueueFamilyProperties**         device_fam_array ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkQueueFamilyProperties.html
+        VkPhysicalDeviceProperties*       device_properties; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceProperties
+        VkPhysicalDeviceFeatures*         device_features  ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceFeatures.html
+        VkPhysicalDeviceMemoryProperties* device_memory    ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceMemoryProperties.html
     };
 
     struct Renderable
     {
-        void* window;  ///< HWND      | Window   | xcb_window_t      | wl_surface* | NSWindow*
+        DeviceFunctions pfn;
+
+        void* window ; ///< HWND      | Window   | xcb_window_t      | wl_surface* | NSWindow*
         void* context; ///< HINSTANCE | Display* | xcb_connection_t* | wl_display* | NSView*
 
-        VkSurfaceKHR surface_handle; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSurfaceKHR.html
-        VkExtent2D surface_size; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkExtent2D.html
+        VkSurfaceKHR surface        ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSurfaceKHR.html
+        VkExtent2D   surface_extent ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkExtent2D.html
 
-        VkDevice device; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDevice.html
-        VkQueue queue_present; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkQueue.html
-        VkQueue queue_graphics; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkQueue.html
-        Offset device_idx;
-        Offset queue_graphics_idx;
-        Offset queue_present_idx;
+        Offset   sel_device        ;
+        Offset   sel_queue_graphics;
+        Offset   sel_queue_present ;
+        VkDevice device            ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDevice.html
+        VkQueue  queue_graphics    ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkQueue.html
+        VkQueue  queue_present     ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkQueue.html
 
-        Offset ds_mode_count;
-        Offset ds_format_count;
-        std::vector<std::vector<VkBool32>> ds_present_supports; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkBool32.html
-        std::vector<std::vector<VkPresentModeKHR>> ds_present_modes; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPresentModeKHR.html
-        std::vector<std::vector<VkSurfaceFormatKHR>> ds_formats; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSurfaceFormatKHR.html
-        std::vector<VkSurfaceCapabilitiesKHR> ds_capabilities; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSurfaceCapabilitiesKHR.html
+        Offset                   ds_present_count;
+        Offset                   ds_formats_count;
+        VkPresentModeKHR*        ds_present_array; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPresentModeKHR.html
+        VkSurfaceFormatKHR*      ds_formats_array; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSurfaceFormatKHR.html
+        VkSurfaceCapabilitiesKHR ds_capabilities ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSurfaceCapabilitiesKHR.html
 
-        VkBuffer buffer_vtx; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkBuffer.html
-        VkBuffer buffer_idx; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkBuffer.html
-        VkBuffer buffer_stg; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkBuffer.html
-        VkMemoryRequirements memreqs_vtx; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkMemoryRequirements.html
-        VkMemoryRequirements memreqs_idx; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkMemoryRequirements.html
-        VkMemoryRequirements memreqs_stg; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkMemoryRequirements.html
-        VkDeviceSize buffer_vtx_offs; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDeviceSize.html
-        VkDeviceSize buffer_idx_offs; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDeviceSize.html
-        VkDeviceSize buffer_stg_offs; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDeviceSize.html
-        VkDeviceSize buffer_vtx_size; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDeviceSize.html
-        VkDeviceSize buffer_idx_size; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDeviceSize.html
-        VkDeviceSize buffer_stg_size; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDeviceSize.html
+        VkDeviceMemory       buffer_memory     ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDeviceMemory.html
+        VkDeviceSize         buffer_capacity   ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDeviceSize.html
+        VkBuffer             buffer_vtx        ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkBuffer.html
+        VkBuffer             buffer_idx        ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkBuffer.html
+        VkBuffer             buffer_stg        ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkBuffer.html
+        VkMemoryRequirements buffer_vtx_memreqs; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkMemoryRequirements.html
+        VkMemoryRequirements buffer_idx_memreqs; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkMemoryRequirements.html
+        VkMemoryRequirements buffer_stg_memreqs; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkMemoryRequirements.html
+        VkDeviceSize         buffer_vtx_offs   ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDeviceSize.html
+        VkDeviceSize         buffer_idx_offs   ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDeviceSize.html
+        VkDeviceSize         buffer_stg_offs   ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDeviceSize.html
+        VkDeviceSize         buffer_vtx_size   ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDeviceSize.html
+        VkDeviceSize         buffer_idx_size   ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDeviceSize.html
+        VkDeviceSize         buffer_stg_size   ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDeviceSize.html
 
-        VkDeviceMemory buffer_memory; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDeviceMemory.html
-        VkDeviceSize buffer_capacity; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDeviceSize.html
+        VkCommandPool         command_pool          ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkCommandPool.html
 
-        VkCommandPool command_pool; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkCommandPool.html
+        Offset atlas_count;
+        void*  atlas_array;
+        VkExtent2D*           atlas_extent ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkExtent2D.html
+        VkImage*              atlas_image  ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkImage.html
+        VkImageView*          atlas_view   ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkImageView.html
+        VkSampler*            atlas_sampler; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSampler.html
+        VkDeviceMemory*       atlas_memory ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDeviceMemory.html
+        VkMemoryRequirements* atlas_memreqs; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkMemoryRequirements
 
-        VkShaderModule module_vertex; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkShaderModule.html
-        VkShaderModule module_fragment; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkShaderModule.html
+        VkShaderModule        module_vertex         ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkShaderModule.html
+        VkShaderModule        module_fragment       ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkShaderModule.html
+        VkRenderPass          render_pass           ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkRenderPass.html
+        VkDescriptorSetLayout descriptor_layout     ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDescriptorSetLayout.html
+        VkDescriptorPool      descriptor_pool       ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDescriptorPool.html
+        VkDescriptorSet       descriptor_set        ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDescriptorSet.html
+        VkPipelineLayout      pipeline_layout       ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPipelineLayout.html
+        VkPipeline pipelines_graphics[num_pipelines]; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPipeline.html
 
-        VkRenderPass render_pass; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkRenderPass.html
-        VkDescriptorSetLayout descriptor_layout; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDescriptorSetLayout.html
-        VkDescriptorPool descriptor_pool; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDescriptorPool.html
-        VkDescriptorSet descriptor_set; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDescriptorSet.html
-        VkPipelineLayout pipeline_layout; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPipelineLayout.html
-        
-        std::array<VkPipeline, num_pipelines> pipelines_graphics; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPipeline.html
+        VkSwapchainKHR   swapchain       ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSwapchainKHR.html
+        Offset           frame_idx       ;
+        Offset           frame_count     ;
+        void*            frame_array     ;
+        VkFence*         frame_fence     ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkFence.html
+        VkSemaphore*     frame_sem_render; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSemaphore.html
+        VkSemaphore*     frame_sem_image ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSemaphore.html
+        VkImage*         frame_image     ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkImage.html
+        VkImageView*     frame_view      ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkImageView.html
+        VkFramebuffer*   frame_buffer    ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkFramebuffer.html
+        VkCommandBuffer* frame_commands  ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkCommandBuffer.html
+    };
 
-        VkSwapchainKHR swapchain; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSwapchainKHR.html
-        
-        Offset num_frames;
-        Offset frame_idx;
-        std::vector<VkFence> frame_fence; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkFence.html
-        std::vector<VkSemaphore> frame_sem_render; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSemaphore.html
-        std::vector<VkSemaphore> frame_sem_image; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSemaphore.html
-        std::vector<VkImage> frame_images; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkImage.html
-        std::vector<VkImageView> frame_views; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkImageView.html
-        std::vector<VkFramebuffer> frame_buffers; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkFramebuffer.html
-        std::vector<VkCommandBuffer> frame_commands; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkCommandBuffer.html
+    struct Vulkan
+    {
+        cvk::Context ctx;
+        cvk::Renderable gfx;
     };
 }
 
 namespace cvk
 {
-    extern Context create_context();
-    extern void destroy_context(Context& ctx);
+    extern void create_context(cvk::Context& ctx);
+    extern void destroy_context(cvk::Context& ctx);
 
-    extern Renderable create_renderable(Context& ctx, wyn_window_t window, bool vsync);
-    extern void destroy_renderable(Context& ctx, Renderable& gfx);
+    extern void create_renderable(cvk::Context& ctx, cvk::Renderable& gfx, wyn_window_t window, bool vsync);
+    extern void destroy_renderable(cvk::Context& ctx, cvk::Renderable& gfx);
 
-    extern Atlas create_atlas(Context& ctx, Renderable& gfx, cge::Texture texture);
-    extern void destroy_atlas(Context& ctx, Renderable& gfx, Atlas& atlas);
-    extern void upload_atlas(Context& ctx, Renderable& gfx, Atlas& atlas);
+    extern void upload_texture(cvk::Context& ctx, cvk::Renderable& gfx, std::size_t atlas_idx, cge::Texture tex);
 
-#if defined(WYN_COCOA)
-    extern void* create_layer(void* window);
-#endif
-
-    extern bool render_frame(Renderable& gfx, const cge::Primitives& prims, const unsigned attempts);
-    extern void update_surface_info(Context& ctx, Renderable& gfx);
-    extern void remake_swapchain(Renderable& gfx, const bool vsync);
+    extern bool render_frame(cvk::Context& ctx, cvk::Renderable& gfx, const cge::Primitives& prims, unsigned attempts);
+    extern void update_surface_info(cvk::Context& ctx, cvk::Renderable& gfx);
+    extern void remake_swapchain(cvk::Context& ctx, cvk::Renderable& gfx, bool vsync);
 }

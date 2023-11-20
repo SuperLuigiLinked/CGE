@@ -7,16 +7,19 @@
 #import <Cocoa/Cocoa.h>
 #import <QuartzCore/CAMetalLayer.h>
 
-#include "cvk.hpp"
+namespace cvk
+{
+    extern void* create_metal_layer(void* ns_view);
+}
 
 namespace cvk
 {
-    extern void* create_layer(void* const window)
+    void* create_metal_layer(void* ns_view)
     {
-        NSWindow* const ns_window{ static_cast<NSWindow*>(window) };
-        NSView* const ns_view{ [ns_window contentView] };
-        ns_view.wantsLayer = YES;
-        return static_cast<void*>(ns_view.layer = reinterpret_cast<CALayer*>([CAMetalLayer layer]));
+        NSView* const view{ static_cast<NSView*>(ns_view) };
+        view.wantsLayer = YES;
+        view.layer = [CAMetalLayer layer];
+        return static_cast<void*>(view.layer);
     }
 }
 

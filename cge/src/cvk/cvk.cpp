@@ -7,31 +7,35 @@
 #include <algorithm>
 #include <filesystem>
 #include <fstream>
+#include <string>
 
 #include "cvk.hpp"
 
-#define CGE_LOAD_INSTANCE(handle, var, func) var.func = reinterpret_cast<PFN_##func>(vkGetInstanceProcAddr(handle, #func))
-#define CGE_LOAD_DEVICE(handle, var, func) var.func = reinterpret_cast<PFN_##func>(vkGetDeviceProcAddr(handle, #func))
-
 namespace cvk
 {
-    static std::uint64_t rank_device(Context& ctx, Renderable& gfx, Offset device_idx);
-    static std::uint64_t rank_device_graphics(Context& ctx, Renderable& gfx, Offset device_idx, Offset queue_idx);
-    static std::uint64_t rank_device_present(Context& ctx, Renderable& gfx, Offset device_idx, Offset queue_idx);
+#if defined(WYN_COCOA)
+    extern void* create_metal_layer(void* ns_view);
+#endif
+
+    static void destroy_atlas(cvk::Context& ctx, Renderable& gfx, Offset atlas_idx);
 
     static std::string load_txt(const char* const filepath) noexcept;
     static void compile_spirv(const VkDevice device, VkShaderModule& module, const shaderc::Compiler& compiler, const shaderc::CompileOptions& options, const std::string& file_dir, const char* const file_name, const shaderc_shader_kind shader_kind);
+    static VkDeviceSize map_bytes(const VkDeviceSize buffer_size, void* const buffer, VkDeviceSize& offs, const std::span<const std::byte> bytes);
 
     static Offset find_memtype(const std::span<const VkMemoryType>& mem_types, const Offset alloc_type, const Offset alloc_props) noexcept;
     static VkSurfaceFormatKHR ideal_format(const std::span<const VkSurfaceFormatKHR> formats) noexcept;
     static VkPresentModeKHR ideal_mode(const std::span<const VkPresentModeKHR> modes, const bool vsync) noexcept;
     static VkExtent2D ideal_resolution(const VkExtent2D size, const VkSurfaceCapabilitiesKHR& caps) noexcept;
 
+    static std::uint64_t rank_device(Context& ctx, Renderable& gfx, Offset device_idx);
+    static std::uint64_t rank_device_graphics(Context& ctx, Renderable& gfx, Offset device_idx, Offset queue_idx);
+    static std::uint64_t rank_device_present(Context& ctx, Renderable& gfx, Offset device_idx, Offset queue_idx);
+
     static Offset acquire_image(Renderable& gfx, VkSemaphore signal_sem, std::span<const VkFence> wait_fences, std::span<const VkFence> reset_fences);
     static void record_commands(Renderable& gfx, Offset frame_idx, const cge::Primitives& prims);
     static bool submit_commands(Renderable& gfx, Offset frame_idx, std::span<const VkSemaphore> wait_sems, std::span<const VkSemaphore> signal_sems, VkFence signal_fence);
     static bool present_image(Renderable& gfx, Offset frame_idx, std::span<const VkSemaphore> wait_sems);
-    
 }
 
 namespace cvk
@@ -80,7 +84,7 @@ namespace cvk
         CGE_ASSERT(res_module == VK_SUCCESS);
     }
 
-    static inline VkDeviceSize map_bytes(const VkDeviceSize buffer_size, void* const buffer, VkDeviceSize& offs, const std::span<const std::byte> bytes)
+    static VkDeviceSize map_bytes(const VkDeviceSize buffer_size, void* const buffer, VkDeviceSize& offs, const std::span<const std::byte> bytes)
     {
         const VkDeviceSize size{ static_cast<VkDeviceSize>(bytes.size()) };
         const VkDeviceSize next{ offs + size };
@@ -197,10 +201,9 @@ namespace cvk
 
 namespace cvk
 {
-    Context create_context()
+    void create_context(cvk::Context& ctx)
     {
         CGE_LOG("[CGE] Initializing Vulkan Context...\n");
-        Context ctx{};
         {
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkApplicationInfo.html
             const VkApplicationInfo app_info{
@@ -234,20 +237,26 @@ namespace cvk
             CGE_LOG("[CGE] VK INSTANCE\n");
         }
         {
-            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkEnumerateInstanceExtensionProperties.html
-            const VkResult res_extension_count{ vkEnumerateInstanceExtensionProperties(nullptr, &ctx.instance_extension_count, nullptr) };
-            CGE_ASSERT(res_extension_count == VK_SUCCESS);
-            ctx.instance_extensions.resize(ctx.instance_extension_count);
-            const VkResult res_extensions{ vkEnumerateInstanceExtensionProperties(nullptr, &ctx.instance_extension_count, ctx.instance_extensions.data()) };
-            CGE_ASSERT(res_extensions == VK_SUCCESS);
-
-            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkEnumerateInstanceLayerProperties.html
-            const VkResult res_layer_count{ vkEnumerateInstanceLayerProperties(&ctx.instance_layer_count, nullptr) };
-            CGE_ASSERT(res_layer_count == VK_SUCCESS);
-            ctx.instance_layers.resize(ctx.instance_layer_count);
-            const VkResult res_layers{ vkEnumerateInstanceLayerProperties(&ctx.instance_layer_count, ctx.instance_layers.data()) };
-            CGE_ASSERT(res_layers == VK_SUCCESS);
-
+            {
+                // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkEnumerateInstanceExtensionProperties.html
+                Offset count;
+                const VkResult res_count{ vkEnumerateInstanceExtensionProperties(nullptr, &count, nullptr) };
+                CGE_ASSERT(res_count == VK_SUCCESS);
+                const bool res_resize{ soa::realloc(ctx.instance_ext_array, ctx.instance_ext_count, count) };
+                CGE_ASSERT(res_resize);
+                const VkResult res_props{ vkEnumerateInstanceExtensionProperties(nullptr, &ctx.instance_ext_count, ctx.instance_ext_array) };
+                CGE_ASSERT(res_props == VK_SUCCESS);
+            }
+            {
+                // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkEnumerateInstanceLayerProperties.html
+                Offset count;
+                const VkResult res_count{ vkEnumerateInstanceLayerProperties(&count, nullptr) };
+                CGE_ASSERT(res_count == VK_SUCCESS);
+                const bool res_resize{ soa::realloc(ctx.instance_lyr_array, ctx.instance_lyr_count, count) };
+                CGE_ASSERT(res_resize);
+                const VkResult res_props{ vkEnumerateInstanceLayerProperties(&ctx.instance_lyr_count, ctx.instance_lyr_array) };
+                CGE_ASSERT(res_props == VK_SUCCESS);
+            }
             CGE_LOG("[CGE] VK INSTANCE PROPERTIES\n");
         }
         {
@@ -267,7 +276,7 @@ namespace cvk
                 .flags = {},
                 .messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT,
                 .messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT,
-                .pfnUserCallback = debug_callback,
+                .pfnUserCallback = cvk::debug_callback,
                 .pUserData = {},
             };
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCreateDebugUtilsMessengerEXT.html
@@ -279,79 +288,117 @@ namespace cvk
         #endif
         {
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkEnumeratePhysicalDevices.html
-            const VkResult res_count{ vkEnumeratePhysicalDevices(ctx.instance, &ctx.device_count, nullptr) };
+            Offset device_count{};
+            const VkResult res_count{ vkEnumeratePhysicalDevices(ctx.instance, &device_count, nullptr) };
             CGE_ASSERT(res_count == VK_SUCCESS);
-            ctx.device_handles.resize(ctx.device_count);
-            ctx.device_extension_counts.resize(ctx.device_count);
-            ctx.device_extensions.resize(ctx.device_count);
-            ctx.device_layer_counts.resize(ctx.device_count);
-            ctx.device_layers.resize(ctx.device_count);
-            ctx.device_properties.resize(ctx.device_count);
-            ctx.device_features.resize(ctx.device_count);
-            ctx.device_memory.resize(ctx.device_count);
-            ctx.device_queue_family_counts.resize(ctx.device_count);
-            ctx.device_queue_families.resize(ctx.device_count);
-            const VkResult res_handles{ vkEnumeratePhysicalDevices(ctx.instance, &ctx.device_count, ctx.device_handles.data()) };
+            const bool res_resize{
+                soa::realloc(
+                    ctx.device_array, ctx.device_count, device_count,
+                    ctx.devices,
+                    ctx.device_ext_count,
+                    ctx.device_lyr_count,
+                    ctx.device_fam_count,
+                    ctx.device_ext_array,
+                    ctx.device_lyr_array,
+                    ctx.device_fam_array,
+                    ctx.device_properties,
+                    ctx.device_features,
+                    ctx.device_memory
+                )
+            };
+            CGE_ASSERT(res_resize);
+            for (Offset idx{}; idx < ctx.device_count; ++idx)
+            {
+                ctx.devices[idx] = {};
+                ctx.device_ext_count[idx] = {};
+                ctx.device_lyr_count[idx] = {};
+                ctx.device_fam_count[idx] = {};
+                ctx.device_ext_array[idx] = {};
+                ctx.device_lyr_array[idx] = {};
+                ctx.device_fam_array[idx] = {};
+            }
+            const VkResult res_handles{ vkEnumeratePhysicalDevices(ctx.instance, &ctx.device_count, ctx.devices) };
             CGE_ASSERT(res_handles == VK_SUCCESS);
-            
-            CGE_LOG("[CGE] VK PHYSICAL DEVICES\n");
+
+            CGE_LOG("[CGE] VK DEVICES\n");
         }
         {
             CGE_ASSERT(ctx.device_count > 0);
 
             for (Offset idx{}; idx < ctx.device_count; ++idx)
             {
-                VkPhysicalDevice& handle{ ctx.device_handles[idx] };
-                Offset& extension_count{ ctx.device_extension_counts[idx] };
-                Offset& layer_count{ ctx.device_layer_counts[idx] };
-                Offset& queue_family_count{ ctx.device_queue_family_counts[idx] };
-                std::vector<VkExtensionProperties>& extensions{ ctx.device_extensions[idx] };
-                std::vector<VkLayerProperties>& layers{ ctx.device_layers[idx] };
-                std::vector<VkQueueFamilyProperties>& queue_families{ ctx.device_queue_families[idx] };
+                VkPhysicalDevice& handle{ ctx.devices[idx] };
+                Offset& ext_count{ ctx.device_ext_count[idx] };
+                Offset& lyr_count{ ctx.device_lyr_count[idx] };
+                Offset& fam_count{ ctx.device_fam_count[idx] };
+                VkExtensionProperties*& ext_array{ ctx.device_ext_array[idx] };
+                VkLayerProperties*& lyr_array{ ctx.device_lyr_array[idx] };
+                VkQueueFamilyProperties*& fam_array{ ctx.device_fam_array[idx] };
                 VkPhysicalDeviceProperties& properties{ ctx.device_properties[idx] };
                 VkPhysicalDeviceFeatures& features{ ctx.device_features[idx] };
                 VkPhysicalDeviceMemoryProperties& memory{ ctx.device_memory[idx] };
 
-                // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkEnumerateDeviceExtensionProperties.html
-                const VkResult res_extension_count{ vkEnumerateDeviceExtensionProperties(handle, nullptr, &extension_count, nullptr) };
-                CGE_ASSERT(res_extension_count == VK_SUCCESS);
-                extensions.resize(extension_count);
-                const VkResult res_extensions{ vkEnumerateDeviceExtensionProperties(handle, nullptr, &extension_count, extensions.data()) };
-                CGE_ASSERT(res_extensions == VK_SUCCESS);
+                {
+                    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkEnumerateDeviceExtensionProperties.html
+                    Offset count;
+                    const VkResult res_count{ vkEnumerateDeviceExtensionProperties(handle, nullptr, &count, nullptr) };
+                    CGE_ASSERT(res_count == VK_SUCCESS);
+                    const bool res_resize{ soa::realloc(ext_array, ext_count, count) };
+                    CGE_ASSERT(res_resize);
+                    const VkResult res_props{ vkEnumerateDeviceExtensionProperties(handle, nullptr, &ext_count, ext_array) };
+                    CGE_ASSERT(res_props == VK_SUCCESS);
+                }
+                {
+                    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkEnumerateDeviceLayerProperties.html
+                    Offset count;
+                    const VkResult res_count{ vkEnumerateDeviceLayerProperties(handle, &count, nullptr) };
+                    CGE_ASSERT(res_count == VK_SUCCESS);
+                    const bool res_resize{ soa::realloc(lyr_array, lyr_count, count) };
+                    CGE_ASSERT(res_resize);
+                    const VkResult res_layers{ vkEnumerateDeviceLayerProperties(handle, &lyr_count, lyr_array) };
+                    CGE_ASSERT(res_layers == VK_SUCCESS);
+                }
+                {
+                    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceQueueFamilyProperties.html
+                    Offset count;
+                    vkGetPhysicalDeviceQueueFamilyProperties(handle, &count, nullptr);
+                    const bool res_resize{ soa::realloc(fam_array, fam_count, count) };
+                    CGE_ASSERT(res_resize);
+                    vkGetPhysicalDeviceQueueFamilyProperties(handle, &fam_count, fam_array);
+                }
+                {
+                    //https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceProperties.html
+                    vkGetPhysicalDeviceProperties(handle, &properties);
 
-                // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkEnumerateDeviceLayerProperties.html
-                const VkResult res_layer_count{ vkEnumerateDeviceLayerProperties(handle, &layer_count, nullptr) };
-                CGE_ASSERT(res_layer_count == VK_SUCCESS);
-                layers.resize(layer_count);
-                const VkResult res_layers{ vkEnumerateDeviceLayerProperties(handle, &layer_count, layers.data()) };
-                CGE_ASSERT(res_layers == VK_SUCCESS);
+                    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceFeatures.html
+                    vkGetPhysicalDeviceFeatures(handle, &features);
 
-                // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceQueueFamilyProperties.html
-                vkGetPhysicalDeviceQueueFamilyProperties(handle, &queue_family_count, nullptr);
-                queue_families.resize(queue_family_count);
-                vkGetPhysicalDeviceQueueFamilyProperties(handle, &queue_family_count, queue_families.data());
-
-                //https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceProperties.html
-                vkGetPhysicalDeviceProperties(handle, &properties);
-
-                // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceFeatures.html
-                vkGetPhysicalDeviceFeatures(handle, &features);
-
-                // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceMemoryProperties.html
-                vkGetPhysicalDeviceMemoryProperties(handle, &memory);
+                    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceMemoryProperties.html
+                    vkGetPhysicalDeviceMemoryProperties(handle, &memory);
+                }
             }
 
-            CGE_LOG("[CGE] VK PHYSICAL DEVICE PROPERTIES\n");
+            CGE_LOG("[CGE] VK DEVICE PROPERTIES\n");
         }
-        return ctx;
     }
 
     void destroy_context(Context& ctx)
     {
+        for (Offset idx{}; idx < ctx.device_count; ++idx)
+        {
+            soa::dealloc(ctx.device_fam_array[idx], ctx.device_fam_count[idx]);
+            soa::dealloc(ctx.device_lyr_array[idx], ctx.device_lyr_count[idx]);
+            soa::dealloc(ctx.device_ext_array[idx], ctx.device_ext_count[idx]);
+        }
+        soa::dealloc(ctx.device_array, ctx.device_count);
+
     #if defined(CGE_VALIDATE_VK)
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyDebugUtilsMessengerEXT.html
         ctx.pfn.vkDestroyDebugUtilsMessengerEXT(ctx.instance, ctx.messenger, nullptr);
     #endif
+
+        soa::dealloc(ctx.instance_lyr_array, ctx.instance_lyr_count);
+        soa::dealloc(ctx.instance_ext_array, ctx.instance_ext_count);
 
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyInstance.html
         vkDestroyInstance(ctx.instance, nullptr);
@@ -360,10 +407,9 @@ namespace cvk
 
 namespace cvk
 {
-    Renderable create_renderable(Context& ctx, wyn_window_t const window, bool const vsync [[maybe_unused]])
+    void create_renderable(Context& ctx, Renderable& gfx, wyn_window_t const window, bool const vsync)
     {
         CGE_LOG("[CGE] Initializing Vulkan Window...\n");
-        Renderable gfx{};
         {
             gfx.window = static_cast<void*>(window);
             CGE_ASSERT(gfx.window);
@@ -384,7 +430,7 @@ namespace cvk
                 .hwnd = static_cast<HWND>(gfx.window),
             };
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCreateWin32SurfaceKHR.html
-            const VkResult res_surface{ vkCreateWin32SurfaceKHR(ctx.instance, &create_info, nullptr, &gfx.surface_handle) };
+            const VkResult res_surface{ vkCreateWin32SurfaceKHR(ctx.instance, &create_info, nullptr, &gfx.surface) };
         #elif defined(WYN_XLIB)
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkXlibSurfaceCreateInfoKHR.html
             const VkXlibSurfaceCreateInfoKHR create_info{
@@ -395,7 +441,7 @@ namespace cvk
                 .window = static_cast<Window>(std::uintptr_t(gfx.window)),
             };
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCreateXlibSurfaceKHR.html
-            const VkResult res_surface{ vkCreateXlibSurfaceKHR(ctx.instance, &create_info, nullptr, &gfx.surface_handle) };
+            const VkResult res_surface{ vkCreateXlibSurfaceKHR(ctx.instance, &create_info, nullptr, &gfx.surface) };
         #elif defined(WYN_XCB) || defined(WYN_X11)
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkXcbSurfaceCreateInfoKHR.html
             const VkXcbSurfaceCreateInfoKHR create_info{
@@ -406,7 +452,7 @@ namespace cvk
                 .window = static_cast<xcb_window_t>(std::uintptr_t(gfx.window)),
             };
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCreateXcbSurfaceKHR.html
-            const VkResult res_surface{ vkCreateXcbSurfaceKHR(ctx.instance, &create_info, nullptr, &gfx.surface_handle) };
+            const VkResult res_surface{ vkCreateXcbSurfaceKHR(ctx.instance, &create_info, nullptr, &gfx.surface) };
         #elif defined(WYN_WAYLAND)
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkWaylandSurfaceCreateInfoKHR.html
             const VkWaylandSurfaceCreateInfoKHR create_info{
@@ -417,17 +463,17 @@ namespace cvk
                 .surface = static_cast<wl_surface*>(gfx.window),
             };
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCreateWaylandSurfaceKHR.html
-            const VkResult res_surface{ vkCreateWaylandSurfaceKHR(ctx.instance, &create_info, nullptr, &gfx.surface_handle) };
+            const VkResult res_surface{ vkCreateWaylandSurfaceKHR(ctx.instance, &create_info, nullptr, &gfx.surface) };
         #elif defined(WYN_COCOA)
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkMetalSurfaceCreateInfoEXT.html
             const VkMetalSurfaceCreateInfoEXT create_info{
                 .sType = VK_STRUCTURE_TYPE_METAL_SURFACE_CREATE_INFO_EXT,
                 .pNext = {},
                 .flags = {},
-                .pLayer = static_cast<const CAMetalLayer*>(cvk::create_layer(gfx.window)),
+                .pLayer = static_cast<const CAMetalLayer*>(cvk::create_metal_layer(gfx.window)),
             };
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCreateMetalSurfaceEXT.html
-            const VkResult res_surface{ vkCreateMetalSurfaceEXT(ctx.instance, &create_info, nullptr, &gfx.surface_handle) };
+            const VkResult res_surface{ vkCreateMetalSurfaceEXT(ctx.instance, &create_info, nullptr, &gfx.surface) };
         #else
             #error "Unimplemented"
         #endif
@@ -466,32 +512,32 @@ namespace cvk
                     present_idx = 0;
                     present_rank = 0;
 
-                    const Offset queue_count{ ctx.device_queue_family_counts[di] };
-                    for (Offset qi{}; qi < queue_count; ++qi)
+                    const Offset fam_count{ ctx.device_fam_count[di] };
+                    for (Offset qfi{}; qfi < fam_count; ++qfi)
                     {
-                        const std::uint64_t rank_g{ rank_device_graphics(ctx, gfx, di, qi) };
+                        const std::uint64_t rank_g{ rank_device_graphics(ctx, gfx, di, qfi) };
                         if (rank_g > graphics_rank)
                         {
-                            graphics_idx = qi;
+                            graphics_idx = qfi;
                             graphics_rank = rank_g;
                         }
 
-                        const std::uint64_t rank_p{ rank_device_present(ctx, gfx, di, qi) };
+                        const std::uint64_t rank_p{ rank_device_present(ctx, gfx, di, qfi) };
                         if (rank_p > present_rank)
                         {
-                            present_idx = qi;
+                            present_idx = qfi;
                             present_rank = rank_g;
                         }
                     }
                 }
             }
 
-            gfx.device_idx = device_idx;
-            gfx.queue_graphics_idx = graphics_idx;
-            gfx.queue_present_idx = present_idx;
+            gfx.sel_device = device_idx;
+            gfx.sel_queue_graphics = graphics_idx;
+            gfx.sel_queue_present = present_idx;
 
             {
-                const auto& dev_props{ ctx.device_properties[gfx.device_idx] };
+                const auto& dev_props{ ctx.device_properties[gfx.sel_device] };
                 CGE_LOG("[CGE] Selected: \"{}\"\n", dev_props.deviceName);
             }
             CGE_LOG("[CGE] VK DEVICE SELECTION\n");
@@ -506,7 +552,7 @@ namespace cvk
                     .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
                     .pNext = {},
                     .flags = {},
-                    .queueFamilyIndex = gfx.queue_graphics_idx,
+                    .queueFamilyIndex = gfx.sel_queue_graphics,
                     .queueCount = graphics_prios.size(),
                     .pQueuePriorities = graphics_prios.data(),
                 },
@@ -514,7 +560,7 @@ namespace cvk
                     .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
                     .pNext = {},
                     .flags = {},
-                    .queueFamilyIndex = gfx.queue_present_idx,
+                    .queueFamilyIndex = gfx.sel_queue_present,
                     .queueCount = present_prios.size(),
                     .pQueuePriorities = present_prios.data(),
                 },
@@ -522,10 +568,10 @@ namespace cvk
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceFeatures.html
             static constexpr VkPhysicalDeviceFeatures features{};
 
-            const bool queues_unique{ gfx.queue_graphics_idx != gfx.queue_present_idx };
+            const bool queues_unique{ gfx.sel_queue_graphics != gfx.sel_queue_present };
             const Offset queue_unique_count{ static_cast<Offset>(queues_unique ? 2 : 1) };
             //const Offset queue_concurrent_count{ static_cast<Offset>(queues_unique ? 2 : 0) };
-            //const std::array queue_indices{ gfx.queue_graphics_idx, gfx.queue_present_idx };
+            //const std::array queue_indices{ gfx.sel_queue_graphics, gfx.sel_queue_present };
             //const VkSharingMode queue_sharing{ queues_unique ? VK_SHARING_MODE_CONCURRENT : VK_SHARING_MODE_EXCLUSIVE };
 
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDeviceCreateInfo.html
@@ -543,12 +589,12 @@ namespace cvk
             };
 
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCreateDevice.html
-            const VkResult res_device{ vkCreateDevice(ctx.device_handles[gfx.device_idx], &device_info, nullptr, &gfx.device) };
+            const VkResult res_device{ vkCreateDevice(ctx.devices[gfx.sel_device], &device_info, nullptr, &gfx.device) };
             CGE_ASSERT(res_device == VK_SUCCESS);
 
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetDeviceQueue.html
-            vkGetDeviceQueue(gfx.device, gfx.queue_graphics_idx, 0, &gfx.queue_graphics);
-            vkGetDeviceQueue(gfx.device, gfx.queue_present_idx, 0, &gfx.queue_present);
+            vkGetDeviceQueue(gfx.device, gfx.sel_queue_graphics, 0, &gfx.queue_graphics);
+            vkGetDeviceQueue(gfx.device, gfx.sel_queue_present, 0, &gfx.queue_present);
 
             CGE_LOG("[CGE] VK LOGICAL DEVICE\n");
         }
@@ -601,18 +647,18 @@ namespace cvk
             CGE_ASSERT(res_stg == VK_SUCCESS);
 
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetBufferMemoryRequirements.html
-            vkGetBufferMemoryRequirements(gfx.device, gfx.buffer_vtx, &gfx.memreqs_vtx);
-            vkGetBufferMemoryRequirements(gfx.device, gfx.buffer_idx, &gfx.memreqs_idx);
-            vkGetBufferMemoryRequirements(gfx.device, gfx.buffer_stg, &gfx.memreqs_stg);
+            vkGetBufferMemoryRequirements(gfx.device, gfx.buffer_vtx, &gfx.buffer_vtx_memreqs);
+            vkGetBufferMemoryRequirements(gfx.device, gfx.buffer_idx, &gfx.buffer_idx_memreqs);
+            vkGetBufferMemoryRequirements(gfx.device, gfx.buffer_stg, &gfx.buffer_stg_memreqs);
         
             CGE_LOG("[CGE] VK BUFFERS\n");
         }
         {
-            const VkDeviceSize alloc_size{ gfx.memreqs_vtx.size + gfx.memreqs_idx.size + gfx.memreqs_stg.size };
-            const Offset alloc_type{ gfx.memreqs_vtx.memoryTypeBits & gfx.memreqs_idx.memoryTypeBits & gfx.memreqs_stg.memoryTypeBits };
+            const VkDeviceSize alloc_size{ gfx.buffer_vtx_memreqs.size + gfx.buffer_idx_memreqs.size + gfx.buffer_stg_memreqs.size };
+            const Offset alloc_type{ gfx.buffer_vtx_memreqs.memoryTypeBits & gfx.buffer_idx_memreqs.memoryTypeBits & gfx.buffer_stg_memreqs.memoryTypeBits };
             constexpr VkMemoryPropertyFlags alloc_props{ VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT };
             
-            const VkPhysicalDeviceMemoryProperties& mem_props{ ctx.device_memory[gfx.device_idx] };
+            const VkPhysicalDeviceMemoryProperties& mem_props{ ctx.device_memory[gfx.sel_device] };
             const std::span<const VkMemoryType> mem_types{ mem_props.memoryTypes, mem_props.memoryTypeCount };
             const Offset mem_idx{ cvk::find_memtype(mem_types, alloc_type, alloc_props) };
             CGE_ASSERT(mem_idx != null_idx);
@@ -649,7 +695,7 @@ namespace cvk
                 .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
                 .pNext = {},
                 .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-                .queueFamilyIndex = gfx.queue_graphics_idx,
+                .queueFamilyIndex = gfx.sel_queue_graphics,
             };
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCreateCommandPool.html
             const VkResult res_pool{ vkCreateCommandPool(gfx.device, &pool_info, nullptr, &gfx.command_pool) };
@@ -668,7 +714,7 @@ namespace cvk
             CGE_LOG("[CGE] VK SHADERS\n");
         }
         {
-            const VkSurfaceFormatKHR surface_format{ cvk::ideal_format(gfx.ds_formats[gfx.device_idx]) };
+            const VkSurfaceFormatKHR surface_format{ cvk::ideal_format({gfx.ds_formats_array, gfx.ds_formats_count}) };
 
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkAttachmentDescription.html
             const VkAttachmentDescription attachment_desc{
@@ -885,10 +931,10 @@ namespace cvk
             };
 
             const wyn_size_t wyn_size{ wyn_window_size(window) };
-            gfx.surface_size = { .width = Offset(wyn_size.w), .height = Offset(wyn_size.h) };
+            gfx.surface_extent = { .width = Offset(wyn_size.w), .height = Offset(wyn_size.h) };
 
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkExtent2D.html
-            const VkExtent2D ideal_res{ cvk::ideal_resolution(gfx.surface_size, gfx.ds_capabilities[gfx.device_idx]) };
+            const VkExtent2D ideal_res{ cvk::ideal_resolution(gfx.surface_extent, gfx.ds_capabilities) };
             const VkExtent2D image_res{ .width = (ideal_res.width ? ideal_res.width : 1 ), .height = (ideal_res.height ? ideal_res.height : 1 ) };
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkViewport.html
             const VkViewport viewport{
@@ -1062,17 +1108,57 @@ namespace cvk
             };
 
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCreateGraphicsPipelines.html
-            const VkResult res_graphics{ vkCreateGraphicsPipelines(gfx.device, nullptr, pipeline_infos.size(), pipeline_infos.data(), nullptr, gfx.pipelines_graphics.data()) };
+            const VkResult res_graphics{ vkCreateGraphicsPipelines(gfx.device, nullptr, pipeline_infos.size(), pipeline_infos.data(), nullptr, gfx.pipelines_graphics) };
             CGE_ASSERT(res_graphics == VK_SUCCESS);
 
             CGE_LOG("[CGE] VK GRAPHICS PIPELINES\n");
         }
         {
-            remake_swapchain(gfx, vsync);
+            if (gfx.atlas_count > 0)
+            {
+                // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDeviceWaitIdle.html
+                const VkResult res_wait{ vkDeviceWaitIdle(gfx.device) };
+                (void)res_wait;
+
+                for (Offset idx{}; idx < gfx.atlas_count; ++idx)
+                {
+                    cvk::destroy_atlas(ctx, gfx, idx);
+                }
+            }
+            {
+                const Offset count{ 1 };
+                const bool res_resize{
+                    soa::realloc(gfx.atlas_array, gfx.atlas_count, count,
+                        gfx.atlas_extent,
+                        gfx.atlas_image,
+                        gfx.atlas_view,
+                        gfx.atlas_sampler,
+                        gfx.atlas_memory,
+                        gfx.atlas_memreqs
+                    )
+                };
+                CGE_ASSERT(res_resize);
+                for (Offset idx{}; idx < gfx.atlas_count; ++idx)
+                {
+                    gfx.atlas_extent[idx] = {};
+                    gfx.atlas_image[idx] = {};
+                    gfx.atlas_view[idx] = {};
+                    gfx.atlas_sampler[idx] = {};
+                    gfx.atlas_memory[idx] = {};
+                }
+            }
+            for (Offset idx{}; idx < gfx.atlas_count; ++idx)
+            {
+                cvk::upload_texture(ctx, gfx, idx, cvk::default_texture);
+            }
+
+            CGE_LOG("[CGE] VK TEXTURE ATLAS\n");
+        }
+        {
+            cvk::remake_swapchain(ctx, gfx, vsync);
 
             CGE_LOG("[CGE] VK SWAPCHAIN\n");
         }
-        return gfx;
     }
 
     void destroy_renderable(Context& ctx, Renderable& gfx)
@@ -1081,37 +1167,37 @@ namespace cvk
         const VkResult res_wait{ vkDeviceWaitIdle(gfx.device) };
         (void)res_wait;
 
+        for (Offset idx{}; idx < gfx.atlas_count; ++idx) cvk::destroy_atlas(ctx, gfx, idx);
+        soa::dealloc(gfx.atlas_array, gfx.atlas_count);
+
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkFreeCommandBuffers.html
-        vkFreeCommandBuffers(gfx.device, gfx.command_pool, Offset(gfx.frame_commands.size()), gfx.frame_commands.data());
-        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyFramebuffer.html
-        for (const VkFramebuffer buffer : gfx.frame_buffers) vkDestroyFramebuffer(gfx.device, buffer, nullptr);
-        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyImageView.html
-        for (const VkImageView view : gfx.frame_views) vkDestroyImageView(gfx.device, view, nullptr);
-
-        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroySemaphore.html
-        for (const VkSemaphore sem : gfx.frame_sem_image) vkDestroySemaphore(gfx.device, sem, nullptr);
-        for (const VkSemaphore sem : gfx.frame_sem_render) vkDestroySemaphore(gfx.device, sem, nullptr);
-        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyFence.html
-        for (const VkFence fence : gfx.frame_fence) vkDestroyFence(gfx.device, fence, nullptr);
-
+        vkFreeCommandBuffers(gfx.device, gfx.command_pool, Offset(gfx.frame_count), gfx.frame_commands);
+        for (Offset idx{}; idx < gfx.frame_count; ++idx)
+        {
+            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyFramebuffer.html
+            vkDestroyFramebuffer(gfx.device, gfx.frame_buffer[idx], nullptr);
+            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyImageView.html
+            vkDestroyImageView(gfx.device, gfx.frame_view[idx], nullptr);
+            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroySemaphore.html
+            vkDestroySemaphore(gfx.device, gfx.frame_sem_image[idx], nullptr);
+            vkDestroySemaphore(gfx.device, gfx.frame_sem_render[idx], nullptr);
+            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyFence.html
+            vkDestroyFence(gfx.device, gfx.frame_fence[idx], nullptr);
+        }
+        soa::dealloc(gfx.frame_array, gfx.frame_count);
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroySwapchainKHR.html
         vkDestroySwapchainKHR(gfx.device, gfx.swapchain, nullptr);
 
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyPipeline.html
         for (const VkPipeline pipeline : gfx.pipelines_graphics) vkDestroyPipeline(gfx.device, pipeline, nullptr);
-
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyDescriptorPool.html
         vkDestroyDescriptorPool(gfx.device, gfx.descriptor_pool, nullptr);
-
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyDescriptorSetLayout.html
         vkDestroyDescriptorSetLayout(gfx.device, gfx.descriptor_layout, nullptr);
-
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyPipelineLayout.html
         vkDestroyPipelineLayout(gfx.device, gfx.pipeline_layout, nullptr);
-
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyRenderPass.html
         vkDestroyRenderPass(gfx.device, gfx.render_pass, nullptr);
-
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyShaderModule.html
         vkDestroyShaderModule(gfx.device, gfx.module_fragment, nullptr);
         vkDestroyShaderModule(gfx.device, gfx.module_vertex, nullptr);
@@ -1123,12 +1209,14 @@ namespace cvk
         vkDestroyBuffer(gfx.device, gfx.buffer_stg, nullptr);
         vkDestroyBuffer(gfx.device, gfx.buffer_idx, nullptr);
         vkDestroyBuffer(gfx.device, gfx.buffer_vtx, nullptr);
-
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkFreeMemory.html
         vkFreeMemory(gfx.device, gfx.buffer_memory, nullptr);
 
+        soa::dealloc(gfx.ds_formats_array, gfx.ds_formats_count);
+        soa::dealloc(gfx.ds_present_array, gfx.ds_present_count);
+
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroySurfaceKHR.html
-        vkDestroySurfaceKHR(ctx.instance, gfx.surface_handle, nullptr);
+        vkDestroySurfaceKHR(ctx.instance, gfx.surface, nullptr);
 
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyDevice.html        
         vkDestroyDevice(gfx.device, nullptr);
@@ -1137,12 +1225,14 @@ namespace cvk
 
 namespace cvk
 {
-    Atlas create_atlas(Context& ctx, Renderable& gfx, cge::Texture const texture)
+    void upload_texture(Context& ctx, Renderable& gfx, const std::size_t atlas_idx, cge::Texture texture)
     {
-        Atlas atlas{ .tex = texture.empty() ? default_texture : texture };
+        CGE_ASSERT(atlas_idx < gfx.atlas_count);
+
+        if (texture.empty()) texture = default_texture;
 
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkExtent3D.html
-        const VkExtent3D tex_extent{ .width = atlas.tex.width, .height = atlas.tex.height, .depth = 1 };
+        const VkExtent3D tex_extent{ .width = texture.width, .height = texture.height, .depth = 1 };
 
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkFormat.html
         const VkFormat tex_format{ VK_FORMAT_R8G8B8A8_UNORM };
@@ -1174,33 +1264,32 @@ namespace cvk
                 .pQueueFamilyIndices = {},
                 .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
             };
-
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCreateImage.html
-            const VkResult res_image{ vkCreateImage(gfx.device, &image_info, nullptr, &atlas.image) };
+            const VkResult res_image{ vkCreateImage(gfx.device, &image_info, nullptr, &gfx.atlas_image[atlas_idx]) };
             CGE_ASSERT(res_image == VK_SUCCESS);
 
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetImageMemoryRequirements.html
-            vkGetImageMemoryRequirements(gfx.device, atlas.image, &atlas.memreqs);
+            vkGetImageMemoryRequirements(gfx.device, gfx.atlas_image[atlas_idx], &gfx.atlas_memreqs[atlas_idx]);
         }
         {
-            const VkPhysicalDeviceMemoryProperties& mem_props{ ctx.device_memory[gfx.device_idx] };
+            const VkPhysicalDeviceMemoryProperties& mem_props{ ctx.device_memory[gfx.sel_device] };
             const std::span<const VkMemoryType> mem_types{ mem_props.memoryTypes, mem_props.memoryTypeCount };
-            const Offset mem_idx{ cvk::find_memtype(mem_types, atlas.memreqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) };
+            const Offset mem_idx{ cvk::find_memtype(mem_types, gfx.atlas_memreqs[atlas_idx].memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) };
             CGE_ASSERT(mem_idx != null_idx);
 
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkMemoryAllocateInfo.html
             const VkMemoryAllocateInfo alloc_info{
                 .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
                 .pNext = {},
-                .allocationSize = atlas.memreqs.size,
+                .allocationSize = gfx.atlas_memreqs[atlas_idx].size,
                 .memoryTypeIndex = mem_idx,
             };
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkAllocateMemory.html
-            const VkResult res_alloc{ vkAllocateMemory(gfx.device, &alloc_info, nullptr, &atlas.memory) };
+            const VkResult res_alloc{ vkAllocateMemory(gfx.device, &alloc_info, nullptr, &gfx.atlas_memory[atlas_idx]) };
             CGE_ASSERT(res_alloc == VK_SUCCESS);
 
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkBindImageMemory.html
-            const VkResult res_bind{ vkBindImageMemory(gfx.device, atlas.image, atlas.memory, 0) };
+            const VkResult res_bind{ vkBindImageMemory(gfx.device, gfx.atlas_image[atlas_idx], gfx.atlas_memory[atlas_idx], 0) };
             CGE_ASSERT(res_bind == VK_SUCCESS);
         }        
         {
@@ -1209,7 +1298,7 @@ namespace cvk
                 .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
                 .pNext = {},
                 .flags = {},
-                .image = atlas.image,
+                .image = gfx.atlas_image[atlas_idx],
                 .viewType = VK_IMAGE_VIEW_TYPE_2D,
                 .format = tex_format,
                 .components = tex_remapping,
@@ -1222,7 +1311,7 @@ namespace cvk
                 },
             };
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCreateImageView.html
-            const VkResult res_view{ vkCreateImageView(gfx.device, &view_info, nullptr, &atlas.view) };
+            const VkResult res_view{ vkCreateImageView(gfx.device, &view_info, nullptr, &gfx.atlas_view[atlas_idx]) };
             CGE_ASSERT(res_view == VK_SUCCESS);
         }
         {
@@ -1248,228 +1337,216 @@ namespace cvk
                 .unnormalizedCoordinates = VK_FALSE,
             };
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCreateSampler.html
-            const VkResult res_sampler{ vkCreateSampler(gfx.device, &sampler_info, nullptr, &atlas.sampler) };
+            const VkResult res_sampler{ vkCreateSampler(gfx.device, &sampler_info, nullptr, &gfx.atlas_sampler[atlas_idx]) };
             CGE_ASSERT(res_sampler == VK_SUCCESS);
         }
-        return atlas;
+        {
+            const auto single_commands = [&](auto&& callback) noexcept
+            {
+                const VkCommandPool command_pool{ gfx.command_pool };
+                const VkQueue queue{ gfx.queue_graphics };
+                VkCommandBuffer command_buffer{};
+
+                // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkCommandBufferAllocateInfo.html
+                const VkCommandBufferAllocateInfo alloc_info{
+                    .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+                    .pNext = {},
+                    .commandPool = command_pool,
+                    .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+                    .commandBufferCount = 1,
+                };
+                // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkAllocateCommandBuffers.html
+                const VkResult res_alloc{ vkAllocateCommandBuffers(gfx.device, &alloc_info, &command_buffer) };
+                CGE_ASSERT(res_alloc == VK_SUCCESS);
+                
+                // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkCommandBufferBeginInfo.html
+                const VkCommandBufferBeginInfo begin_info{
+                    .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+                    .pNext = {},
+                    .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
+                    .pInheritanceInfo = {},
+                };
+                // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkBeginCommandBuffer.html
+                vkBeginCommandBuffer(command_buffer, &begin_info);
+
+                try { callback(command_buffer); } catch (...) {}
+
+                // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkEndCommandBuffer.html
+                vkEndCommandBuffer(command_buffer);
+                
+                // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSubmitInfo.html
+                const VkSubmitInfo submit_info{
+                    .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+                    .pNext = {},
+                    .waitSemaphoreCount = {},
+                    .pWaitSemaphores = {},
+                    .pWaitDstStageMask = {},
+                    .commandBufferCount = 1,
+                    .pCommandBuffers = &command_buffer,
+                    .signalSemaphoreCount = {},
+                    .pSignalSemaphores = {},
+                };
+
+                // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkQueueSubmit.html
+                const VkResult res_submit{ vkQueueSubmit(queue, 1, &submit_info, nullptr) };
+                CGE_ASSERT(res_submit == VK_SUCCESS);
+
+                // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkQueueWaitIdle.html
+                const VkResult res_wait{ vkQueueWaitIdle(queue) };
+                CGE_ASSERT(res_wait == VK_SUCCESS);
+
+                // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkFreeCommandBuffers.html
+                vkFreeCommandBuffers(gfx.device, command_pool, 1, &command_buffer);
+            };
+
+            const auto transition_atlas = [&](const VkImageLayout old_layout, const VkImageLayout new_layout)
+            {
+                VkAccessFlags src_access{};
+                VkAccessFlags dst_access{};
+                VkPipelineStageFlags src_stage{};
+                VkPipelineStageFlags dst_stage{};
+
+                if ((old_layout == VK_IMAGE_LAYOUT_UNDEFINED) && (new_layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL))
+                {
+                    src_access = 0;
+                    dst_access = VK_ACCESS_TRANSFER_WRITE_BIT;
+                    src_stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+                    dst_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+                }
+                else if ((old_layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) && (new_layout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL))
+                {
+                    src_access = VK_ACCESS_TRANSFER_WRITE_BIT;
+                    dst_access = VK_ACCESS_SHADER_READ_BIT;
+                    src_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+                    dst_stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+                }
+                else CGE_ASSERT(false);
+
+                // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkImageMemoryBarrier.html
+                const VkImageMemoryBarrier barrier{
+                    .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+                    .pNext = {},
+                    .srcAccessMask = src_access,
+                    .dstAccessMask = dst_access,
+                    .oldLayout = old_layout,
+                    .newLayout = new_layout,
+                    .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                    .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                    .image = gfx.atlas_image[atlas_idx],
+                    .subresourceRange = {
+                        .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                        .baseMipLevel = 0,
+                        .levelCount = 1,
+                        .baseArrayLayer = 0,
+                        .layerCount = 1,
+                    },
+                };
+
+                single_commands([&](const VkCommandBuffer command_buffer){
+                    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCmdPipelineBarrier.html
+                    vkCmdPipelineBarrier(command_buffer, src_stage, dst_stage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
+                });
+            };
+
+            const auto stage_texture = [&]()
+            {
+                const VkDeviceSize tex_size{ VkDeviceSize(texture.size()) };
+                CGE_ASSERT(tex_size <= gfx.buffer_stg_size);
+
+                const VkDeviceMemory buffer_memory{ gfx.buffer_memory };
+                const VkDeviceSize buffer_offs{ gfx.buffer_stg_offs };
+                const VkDeviceSize buffer_size{ gfx.buffer_stg_size };
+                {
+                    void* buffer{};
+
+                    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkMapMemory.html
+                    const VkResult res_map{ vkMapMemory(gfx.device, buffer_memory, buffer_offs, buffer_size, 0, &buffer) };
+                    CGE_ASSERT(res_map == VK_SUCCESS);
+
+                    VkDeviceSize offset{};
+                    (void)cvk::map_bytes(buffer_size, buffer, offset, texture.as_bytes());
+
+                    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkUnmapMemory.html
+                    vkUnmapMemory(gfx.device, buffer_memory);
+                }
+            };
+
+            const auto transfer_staged = [&]()
+            {
+                // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkBufferImageCopy.html
+                const VkBufferImageCopy region{
+                    .bufferOffset = {},
+                    .bufferRowLength = {},
+                    .bufferImageHeight = {},
+                    .imageSubresource = {
+                        .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                        .mipLevel = 0,
+                        .baseArrayLayer = 0,
+                        .layerCount = 1,
+                    },
+                    .imageOffset = {},
+                    .imageExtent = tex_extent,
+                };
+
+                single_commands([&](const VkCommandBuffer command_buffer){
+                    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCmdCopyBufferToImage.html
+                    vkCmdCopyBufferToImage(command_buffer, gfx.buffer_stg, gfx.atlas_image[atlas_idx], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+                });
+            };
+
+            const auto update_descriptors = [&]()
+            {
+                // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDescriptorImageInfo.html
+                const VkDescriptorImageInfo image_info{
+                    .sampler = gfx.atlas_sampler[atlas_idx],
+                    .imageView = gfx.atlas_view[atlas_idx],
+                    .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                };
+
+                // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkWriteDescriptorSet.html
+                const VkWriteDescriptorSet sampler_write{
+                    .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                    .pNext = {},
+                    .dstSet = gfx.descriptor_set,
+                    .dstBinding = 0,
+                    .dstArrayElement = 0,
+                    .descriptorCount = 1,
+                    .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                    .pImageInfo = &image_info,
+                    .pBufferInfo = {},
+                    .pTexelBufferView = {},
+                };
+
+                const std::array writes{ sampler_write };
+                const std::array<VkCopyDescriptorSet, 0> copies{};
+
+                // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkUpdateDescriptorSets.html
+                vkUpdateDescriptorSets(gfx.device, Offset(writes.size()), writes.data(), Offset(copies.size()), copies.data());
+            };
+
+            transition_atlas(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+            stage_texture();
+            transfer_staged();
+            transition_atlas(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+            update_descriptors();
+        }
     }
 
-    void destroy_atlas([[maybe_unused]] Context& ctx, Renderable& gfx, Atlas& atlas)
+    void destroy_atlas(Context& ctx [[maybe_unused]], Renderable& gfx, const Offset atlas_idx)
     {
-        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDeviceWaitIdle.html
-        const VkResult res_wait{ vkDeviceWaitIdle(gfx.device) };
-        (void)res_wait;
-
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroySampler.html
-        vkDestroySampler(gfx.device, atlas.sampler, nullptr);
+        vkDestroySampler(gfx.device, gfx.atlas_sampler[atlas_idx], nullptr);
 
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyImageView.html
-        vkDestroyImageView(gfx.device, atlas.view, nullptr);
+        vkDestroyImageView(gfx.device, gfx.atlas_view[atlas_idx], nullptr);
 
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyImage.html
-        vkDestroyImage(gfx.device, atlas.image, nullptr);
+        vkDestroyImage(gfx.device, gfx.atlas_image[atlas_idx], nullptr);
 
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkFreeMemory.html
-        vkFreeMemory(gfx.device, atlas.memory, nullptr);
-    }
-
-    void upload_atlas([[maybe_unused]] Context& ctx, Renderable& gfx, Atlas& atlas)
-    {
-        const auto single_commands = [&](auto&& callback) noexcept
-        {
-            const VkCommandPool command_pool{ gfx.command_pool };
-            const VkQueue queue{ gfx.queue_graphics };
-            VkCommandBuffer command_buffer{};
-
-            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkCommandBufferAllocateInfo.html
-            const VkCommandBufferAllocateInfo alloc_info{
-                .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-                .pNext = {},
-                .commandPool = command_pool,
-                .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-                .commandBufferCount = 1,
-            };
-            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkAllocateCommandBuffers.html
-            const VkResult res_alloc{ vkAllocateCommandBuffers(gfx.device, &alloc_info, &command_buffer) };
-            CGE_ASSERT(res_alloc == VK_SUCCESS);
-            
-            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkCommandBufferBeginInfo.html
-            const VkCommandBufferBeginInfo begin_info{
-                .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-                .pNext = {},
-                .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
-                .pInheritanceInfo = {},
-            };
-            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkBeginCommandBuffer.html
-            vkBeginCommandBuffer(command_buffer, &begin_info);
-
-            try { callback(command_buffer); } catch (...) {}
-
-            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkEndCommandBuffer.html
-            vkEndCommandBuffer(command_buffer);
-            
-            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSubmitInfo.html
-            const VkSubmitInfo submit_info{
-                .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-                .pNext = {},
-                .waitSemaphoreCount = {},
-                .pWaitSemaphores = {},
-                .pWaitDstStageMask = {},
-                .commandBufferCount = 1,
-                .pCommandBuffers = &command_buffer,
-                .signalSemaphoreCount = {},
-                .pSignalSemaphores = {},
-            };
-
-            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkQueueSubmit.html
-            const VkResult res_submit{ vkQueueSubmit(queue, 1, &submit_info, nullptr) };
-            CGE_ASSERT(res_submit == VK_SUCCESS);
-
-            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkQueueWaitIdle.html
-            const VkResult res_wait{ vkQueueWaitIdle(queue) };
-            CGE_ASSERT(res_wait == VK_SUCCESS);
-
-            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkFreeCommandBuffers.html
-            vkFreeCommandBuffers(gfx.device, command_pool, 1, &command_buffer);
-        };
-
-        const auto transition_atlas = [&](const VkImageLayout old_layout, const VkImageLayout new_layout)
-        {
-            VkAccessFlags src_access{};
-            VkAccessFlags dst_access{};
-            VkPipelineStageFlags src_stage{};
-            VkPipelineStageFlags dst_stage{};
-
-            if ((old_layout == VK_IMAGE_LAYOUT_UNDEFINED) && (new_layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL))
-            {
-                src_access = 0;
-                dst_access = VK_ACCESS_TRANSFER_WRITE_BIT;
-                src_stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-                dst_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-            }
-            else if ((old_layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) && (new_layout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL))
-            {
-                src_access = VK_ACCESS_TRANSFER_WRITE_BIT;
-                dst_access = VK_ACCESS_SHADER_READ_BIT;
-                src_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-                dst_stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-            }
-            else CGE_ASSERT(false);
-
-            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkImageMemoryBarrier.html
-            const VkImageMemoryBarrier barrier{
-                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-                .pNext = {},
-                .srcAccessMask = src_access,
-                .dstAccessMask = dst_access,
-                .oldLayout = old_layout,
-                .newLayout = new_layout,
-                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                .image = atlas.image,
-                .subresourceRange = {
-                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                    .baseMipLevel = 0,
-                    .levelCount = 1,
-                    .baseArrayLayer = 0,
-                    .layerCount = 1,
-                },
-            };
-
-            single_commands([&](const VkCommandBuffer command_buffer){
-                // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCmdPipelineBarrier.html
-                vkCmdPipelineBarrier(command_buffer, src_stage, dst_stage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
-            });
-        };
-
-        const auto stage_texture = [&]()
-        {
-            const VkDeviceSize tex_size{ VkDeviceSize(atlas.tex.size()) };
-            CGE_ASSERT(tex_size <= gfx.buffer_stg_size);
-
-            const VkDeviceMemory buffer_memory{ gfx.buffer_memory };
-            const VkDeviceSize buffer_offs{ gfx.buffer_stg_offs };
-            const VkDeviceSize buffer_size{ gfx.buffer_stg_size };
-            {
-                void* buffer{};
-
-                // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkMapMemory.html
-                const VkResult res_map{ vkMapMemory(gfx.device, buffer_memory, buffer_offs, buffer_size, 0, &buffer) };
-                CGE_ASSERT(res_map == VK_SUCCESS);
-
-                VkDeviceSize offset{};
-                (void)cvk::map_bytes(buffer_size, buffer, offset, atlas.tex.as_bytes());
-
-                // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkUnmapMemory.html
-                vkUnmapMemory(gfx.device, buffer_memory);
-            }
-        };
-
-        const auto transfer_staged = [&]()
-        {
-            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkBufferImageCopy.html
-            const VkBufferImageCopy region{
-                .bufferOffset = {},
-                .bufferRowLength = {},
-                .bufferImageHeight = {},
-                .imageSubresource = {
-                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                    .mipLevel = 0,
-                    .baseArrayLayer = 0,
-                    .layerCount = 1,
-                },
-                .imageOffset = {},
-                .imageExtent = {
-                    .width = atlas.tex.width,
-                    .height = atlas.tex.height,
-                    .depth = 1
-                },
-            };
-
-            single_commands([&](const VkCommandBuffer command_buffer){
-                // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCmdCopyBufferToImage.html
-                vkCmdCopyBufferToImage(command_buffer, gfx.buffer_stg, atlas.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
-            });
-        };
-
-        const auto update_descriptors = [&]()
-        {
-            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDescriptorImageInfo.html
-            const VkDescriptorImageInfo image_info{
-                .sampler = atlas.sampler,
-                .imageView = atlas.view,
-                .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-            };
-
-            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkWriteDescriptorSet.html
-            const VkWriteDescriptorSet sampler_write{
-                .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                .pNext = {},
-                .dstSet = gfx.descriptor_set,
-                .dstBinding = 0,
-                .dstArrayElement = 0,
-                .descriptorCount = 1,
-                .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                .pImageInfo = &image_info,
-                .pBufferInfo = {},
-                .pTexelBufferView = {},
-            };
-
-            const std::array writes{ sampler_write };
-            const std::array<VkCopyDescriptorSet, 0> copies{};
-
-            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkUpdateDescriptorSets.html
-            vkUpdateDescriptorSets(gfx.device, Offset(writes.size()), writes.data(), Offset(copies.size()), copies.data());
-        };
-
-        transition_atlas(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-        stage_texture();
-        transfer_staged();
-        transition_atlas(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-        update_descriptors();
+        vkFreeMemory(gfx.device, gfx.atlas_memory[atlas_idx], nullptr);
     }
 }
-
 
 namespace cvk
 {
@@ -1509,11 +1586,11 @@ namespace cvk
     std::uint64_t rank_device(Context& ctx, Renderable& gfx, Offset device_idx)
     {
         const VkPhysicalDeviceProperties& device_props{ ctx.device_properties[device_idx] };
-        const std::span<const VkExtensionProperties> device_exts{ ctx.device_extensions[device_idx] };
-        const std::span<const VkLayerProperties> device_lyrs{ ctx.device_layers[device_idx] };
+        const std::span<const VkExtensionProperties> device_exts{ ctx.device_ext_array[device_idx], ctx.device_ext_count[device_idx] };
+        const std::span<const VkLayerProperties>     device_lyrs{ ctx.device_lyr_array[device_idx], ctx.device_lyr_count[device_idx] };
 
-        if (gfx.ds_format_count == 0) return 0;
-        if (gfx.ds_mode_count == 0) return 0;
+        if (gfx.ds_formats_count == 0) return 0;
+        if (gfx.ds_present_count == 0) return 0;
         if (!cvk::has_extensions(device_exts, req_device_extensions)) return 0;
         if (!cvk::has_layers(device_lyrs, req_device_layers)) return 0;
 
@@ -1534,7 +1611,7 @@ namespace cvk
 
     std::uint64_t rank_device_graphics(Context& ctx, [[maybe_unused]] Renderable& gfx, Offset device_idx, Offset queue_idx)
     {
-        const VkQueueFamilyProperties& qf_props{ ctx.device_queue_families[device_idx][queue_idx] };
+        const VkQueueFamilyProperties& qf_props{ ctx.device_fam_array[device_idx][queue_idx] };
 
         if ((qf_props.queueFlags & VK_QUEUE_GRAPHICS_BIT) == 0) return 0;
 
@@ -1547,8 +1624,12 @@ namespace cvk
 
     std::uint64_t rank_device_present(Context& ctx, Renderable& gfx, Offset device_idx, Offset queue_idx)
     {
-        const VkQueueFamilyProperties& qf_props{ ctx.device_queue_families[device_idx][queue_idx] };
-        const VkBool32 supports_present{ gfx.ds_present_supports[device_idx][queue_idx] };
+        const VkQueueFamilyProperties& qf_props{ ctx.device_fam_array[device_idx][queue_idx] };
+        
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceSurfaceSupportKHR.html
+        VkBool32 supports_present;
+        const VkResult res_support{ vkGetPhysicalDeviceSurfaceSupportKHR(ctx.devices[device_idx], queue_idx, gfx.surface, &supports_present) };
+        CGE_ASSERT(res_support == VK_SUCCESS);
 
         if (!supports_present) return 0;
 
@@ -1562,10 +1643,10 @@ namespace cvk
 
 namespace cvk
 {
-    bool render_frame(Renderable& gfx, const cge::Primitives& prims, const unsigned attempts)
+    bool render_frame(Context& ctx [[maybe_unused]], Renderable& gfx, const cge::Primitives& prims, const unsigned attempts)
     {
         const Offset this_frame{ gfx.frame_idx };
-        const Offset prev_frame{ (this_frame + (gfx.num_frames - 1)) % gfx.num_frames };
+        const Offset prev_frame{ (this_frame + (gfx.frame_count - 1)) % gfx.frame_count };
 
         const VkSemaphore image_acquired{ gfx.frame_sem_image[this_frame] };
         const VkSemaphore render_finished{ gfx.frame_sem_render[this_frame] };
@@ -1580,7 +1661,7 @@ namespace cvk
             CGE_LOG("[CGE] Render {} failed. (Could not acquire image)\n", attempts);
             return false;
         }
-        gfx.frame_idx = (gfx.frame_idx + 1) % gfx.num_frames;
+        gfx.frame_idx = (gfx.frame_idx + 1) % gfx.frame_count;
 
         if (image_idx != this_frame)
         {
@@ -1637,7 +1718,7 @@ namespace cvk
         // ----------------------------------------------------------------
 
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkExtent2D.html
-        const VkExtent2D ideal_res{ cvk::ideal_resolution(gfx.surface_size, gfx.ds_capabilities[gfx.device_idx]) };
+        const VkExtent2D ideal_res{ cvk::ideal_resolution(gfx.surface_extent, gfx.ds_capabilities) };
         const VkExtent2D image_res{ .width = (ideal_res.width ? ideal_res.width : 1 ), .height = (ideal_res.height ? ideal_res.height : 1 ) };
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkViewport.html
         const VkViewport viewport{
@@ -1808,7 +1889,7 @@ namespace cvk
 
         const VkRenderPass render_pass{ gfx.render_pass };
         const VkCommandBuffer command_buffer{ gfx.frame_commands[frame_idx] };
-        const VkFramebuffer frame_buffer{ gfx.frame_buffers[frame_idx] };
+        const VkFramebuffer frame_buffer{ gfx.frame_buffer[frame_idx] };
 
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkCommandBufferBeginInfo.html
         const VkCommandBufferBeginInfo begin_info{
@@ -1939,76 +2020,58 @@ namespace cvk
 {
     void update_surface_info(Context& ctx, Renderable& gfx)
     {
-        const Offset device_count{  ctx.device_count };
-        gfx.ds_present_supports.resize(device_count);
-        gfx.ds_present_modes.resize(device_count);
-        gfx.ds_formats.resize(device_count);
-        gfx.ds_capabilities.resize(device_count);
-        
-        for (Offset di{}; di < device_count; ++di)
+        VkPhysicalDevice& device{ ctx.devices[gfx.sel_device] };
+        VkSurfaceKHR& surface{ gfx.surface };
+
         {
-            VkPhysicalDevice& device{ ctx.device_handles[di] };
-            VkSurfaceKHR& surface{ gfx.surface_handle };
-            std::vector<VkBool32>& present_supports{ gfx.ds_present_supports[di] };
-            std::vector<VkPresentModeKHR>& present_modes{ gfx.ds_present_modes[di] };
-            std::vector<VkSurfaceFormatKHR>& formats{ gfx.ds_formats[di] };
-            VkSurfaceCapabilitiesKHR& capabilities{ gfx.ds_capabilities[di] };
-            Offset& mode_count{ gfx.ds_mode_count };
-            Offset& format_count{ gfx.ds_format_count };
-
-            const Offset queue_count{ ctx.device_queue_family_counts[di] };
-            present_supports.resize(queue_count);
-
-            for (Offset qi{}; qi < queue_count; ++qi)
-            {
-                // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceSurfaceSupportKHR.html
-                const VkResult res_support{ vkGetPhysicalDeviceSurfaceSupportKHR(device, qi, surface, &present_supports[qi]) };
-                CGE_ASSERT(res_support == VK_SUCCESS);
-            }
-
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceSurfacePresentModesKHR.html
-            const VkResult res_mode_count{ vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &mode_count, nullptr) };
-            CGE_ASSERT(res_mode_count == VK_SUCCESS);
-            present_modes.resize(mode_count);
-            const VkResult res_modes{ vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &mode_count, present_modes.data()) };
-            CGE_ASSERT(res_modes == VK_SUCCESS);
-            
+            Offset count;
+            const VkResult res_count{ vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &count, nullptr) };
+            CGE_ASSERT(res_count == VK_SUCCESS);
+            const bool res_resize{ soa::realloc(gfx.ds_present_array, gfx.ds_present_count, count) };
+            CGE_ASSERT(res_resize);
+            const VkResult res_props{ vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &gfx.ds_present_count, gfx.ds_present_array) };
+            CGE_ASSERT(res_props == VK_SUCCESS);
+        }
+        {
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceSurfaceFormatsKHR.html
-            const VkResult res_format_count{ vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &format_count, nullptr) };
-            CGE_ASSERT(res_format_count == VK_SUCCESS);
-            formats.resize(format_count);
-            const VkResult res_formats{ vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &format_count, formats.data()) };
-            CGE_ASSERT(res_formats == VK_SUCCESS);
-
+            Offset count;
+            const VkResult res_count{ vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &count, nullptr) };
+            CGE_ASSERT(res_count == VK_SUCCESS);
+            const bool res_resize{ soa::realloc(gfx.ds_formats_array, gfx.ds_formats_count, count) };
+            CGE_ASSERT(res_resize);
+            const VkResult res_props{ vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &gfx.ds_formats_count, gfx.ds_formats_array) };
+            CGE_ASSERT(res_props == VK_SUCCESS);
+        }
+        {
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceSurfaceCapabilitiesKHR.html
-            const VkResult res_caps{ vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &capabilities) };
+            const VkResult res_caps{ vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &gfx.ds_capabilities) };
             CGE_ASSERT(res_caps == VK_SUCCESS);
         }
     }
 
-    void remake_swapchain(Renderable& gfx, const bool vsync)
+    void remake_swapchain(Context& ctx [[maybe_unused]], Renderable& gfx, const bool vsync)
     {
         const VkSwapchainKHR old_swapchain{ gfx.swapchain };
 
-        const VkSurfaceCapabilitiesKHR& ds_caps{ gfx.ds_capabilities[gfx.device_idx] };
-        const std::span<const VkSurfaceFormatKHR> ds_formats{ gfx.ds_formats[gfx.device_idx] };
-        const std::span<const VkPresentModeKHR> ds_modes{ gfx.ds_present_modes[gfx.device_idx] };
+        const std::span<const VkSurfaceFormatKHR> ds_formats{ gfx.ds_formats_array, gfx.ds_formats_count };
+        const std::span<const VkPresentModeKHR>   ds_present{ gfx.ds_present_array, gfx.ds_present_count };
 
-        const VkExtent2D ideal_res{ cvk::ideal_resolution(gfx.surface_size, ds_caps) };
+        const VkExtent2D ideal_res{ cvk::ideal_resolution(gfx.surface_extent, gfx.ds_capabilities) };
         if ((ideal_res.width == 0) || (ideal_res.height == 0)) return;
 
         const VkSurfaceFormatKHR best_format{ cvk::ideal_format(ds_formats) };
-        const VkPresentModeKHR best_present{ cvk::ideal_mode(ds_modes, vsync) };
+        const VkPresentModeKHR best_present{ cvk::ideal_mode(ds_present, vsync) };
 
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSurfaceCapabilitiesKHR.html#_description
-        const Offset min_images{ ds_caps.minImageCount };
-        const Offset max_images{ ds_caps.maxImageCount };
+        const Offset min_images{ gfx.ds_capabilities.minImageCount };
+        const Offset max_images{ gfx.ds_capabilities.maxImageCount };
         const Offset req_images{ min_images + 1};
         const Offset num_images{ (max_images == 0) ? req_images : std::min(req_images, max_images) };
 
-        const bool queues_unique{ gfx.queue_graphics_idx != gfx.queue_present_idx };
+        const bool queues_unique{ gfx.sel_queue_graphics != gfx.sel_queue_present };
         const Offset queue_concurrent_count{ static_cast<Offset>(queues_unique ? 2 : 0) };
-        const std::array queue_indices{ gfx.queue_graphics_idx, gfx.queue_present_idx };
+        const std::array queue_indices{ gfx.sel_queue_graphics, gfx.sel_queue_present };
         const Offset* queue_indices_ptr{ queues_unique ? queue_indices.data() : nullptr };
         const VkSharingMode queue_sharing{ queues_unique ? VK_SHARING_MODE_CONCURRENT : VK_SHARING_MODE_EXCLUSIVE };
 
@@ -2018,7 +2081,7 @@ namespace cvk
                 .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
                 .pNext = {},
                 .flags = {},
-                .surface = gfx.surface_handle,
+                .surface = gfx.surface,
                 .minImageCount = num_images,
                 .imageFormat = best_format.format,
                 .imageColorSpace = best_format.colorSpace,
@@ -2028,7 +2091,7 @@ namespace cvk
                 .imageSharingMode = queue_sharing,
                 .queueFamilyIndexCount = queue_concurrent_count,
                 .pQueueFamilyIndices = queue_indices_ptr,
-                .preTransform = ds_caps.currentTransform,
+                .preTransform = gfx.ds_capabilities.currentTransform,
                 .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
                 .presentMode = best_present,
                 .clipped = VK_TRUE,
@@ -2045,37 +2108,49 @@ namespace cvk
             CGE_ASSERT(res_wait == VK_SUCCESS);
 
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkFreeCommandBuffers.html
-            vkFreeCommandBuffers(gfx.device, gfx.command_pool, Offset(gfx.frame_commands.size()), gfx.frame_commands.data());
-            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyFramebuffer.html
-            for (const VkFramebuffer buffer : gfx.frame_buffers) vkDestroyFramebuffer(gfx.device, buffer, nullptr);
-            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyImageView.html
-            for (const VkImageView view : gfx.frame_views) vkDestroyImageView(gfx.device, view, nullptr);
-
-            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroySemaphore.html
-            for (const VkSemaphore sem : gfx.frame_sem_image) vkDestroySemaphore(gfx.device, sem, nullptr);
-            for (const VkSemaphore sem : gfx.frame_sem_render) vkDestroySemaphore(gfx.device, sem, nullptr);
-            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyFence.html
-            for (const VkFence fence : gfx.frame_fence) vkDestroyFence(gfx.device, fence, nullptr);
+            vkFreeCommandBuffers(gfx.device, gfx.command_pool, Offset(gfx.frame_count), gfx.frame_commands);
+            for (Offset idx{}; idx < gfx.frame_count; ++idx)
+            {
+                // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyFramebuffer.html
+                vkDestroyFramebuffer(gfx.device, gfx.frame_buffer[idx], nullptr);
+                // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyImageView.html
+                vkDestroyImageView(gfx.device, gfx.frame_view[idx], nullptr);
+                // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroySemaphore.html
+                vkDestroySemaphore(gfx.device, gfx.frame_sem_image[idx], nullptr);
+                vkDestroySemaphore(gfx.device, gfx.frame_sem_render[idx], nullptr);
+                // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyFence.html
+                vkDestroyFence(gfx.device, gfx.frame_fence[idx], nullptr);
+            }
 
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroySwapchainKHR.html
             vkDestroySwapchainKHR(gfx.device, old_swapchain, nullptr);
         }
         {
-            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetSwapchainImagesKHR.html
-            const VkResult res_image_count{ vkGetSwapchainImagesKHR(gfx.device, gfx.swapchain, &gfx.num_frames, nullptr) };
-            CGE_ASSERT(res_image_count == VK_SUCCESS);
-            gfx.frame_idx = 0;
-            gfx.frame_fence.resize(gfx.num_frames);
-            gfx.frame_sem_render.resize(gfx.num_frames);
-            gfx.frame_sem_image.resize(gfx.num_frames);
-            gfx.frame_images.resize(gfx.num_frames);
-            gfx.frame_views.resize(gfx.num_frames);
-            gfx.frame_buffers.resize(gfx.num_frames);
-            gfx.frame_commands.resize(gfx.num_frames);
-            const VkResult res_images{ vkGetSwapchainImagesKHR(gfx.device, gfx.swapchain, &gfx.num_frames, gfx.frame_images.data()) };
-            CGE_ASSERT(res_images == VK_SUCCESS);
+            {
+                gfx.frame_idx = 0;
 
-            for (Offset idx{}; idx < gfx.num_frames; ++idx)
+                // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetSwapchainImagesKHR.html
+                Offset count;
+                const VkResult res_count{ vkGetSwapchainImagesKHR(gfx.device, gfx.swapchain, &count, nullptr) };
+                CGE_ASSERT(res_count == VK_SUCCESS);
+                const bool res_resize{
+                    soa::realloc(
+                        gfx.frame_array, gfx.frame_count, count,
+                        gfx.frame_fence,
+                        gfx.frame_sem_render,
+                        gfx.frame_sem_image,
+                        gfx.frame_image,
+                        gfx.frame_view,
+                        gfx.frame_buffer,
+                        gfx.frame_commands
+                    )
+                };
+                CGE_ASSERT(res_resize);
+                const VkResult res_images{ vkGetSwapchainImagesKHR(gfx.device, gfx.swapchain, &gfx.frame_count, gfx.frame_image) };
+                CGE_ASSERT(res_images == VK_SUCCESS);
+            }
+
+            for (Offset idx{}; idx < gfx.frame_count; ++idx)
             {
                 // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkFenceCreateInfo.html
                 constexpr VkFenceCreateInfo fence_info{
@@ -2103,7 +2178,7 @@ namespace cvk
                     .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
                     .pNext = {},
                     .flags = {},
-                    .image = gfx.frame_images[idx],
+                    .image = gfx.frame_image[idx],
                     .viewType = VK_IMAGE_VIEW_TYPE_2D,
                     .format = best_format.format,
                     .components = {},
@@ -2116,7 +2191,7 @@ namespace cvk
                     },
                 };
                 // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCreateImageView.html
-                const VkResult res_view{ vkCreateImageView(gfx.device, &view_info, nullptr, &gfx.frame_views[idx]) };
+                const VkResult res_view{ vkCreateImageView(gfx.device, &view_info, nullptr, &gfx.frame_view[idx]) };
                 CGE_ASSERT(res_view == VK_SUCCESS);
 
                 // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkFramebufferCreateInfo.html
@@ -2126,13 +2201,13 @@ namespace cvk
                     .flags = {},
                     .renderPass = gfx.render_pass,
                     .attachmentCount = 1,
-                    .pAttachments = &gfx.frame_views[idx],
+                    .pAttachments = &gfx.frame_view[idx],
                     .width = ideal_res.width,
                     .height = ideal_res.height,
                     .layers = 1,
                 };
                 // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCreateFramebuffer.html
-                const VkResult res_buffer{ vkCreateFramebuffer(gfx.device, &buffer_info, nullptr, &gfx.frame_buffers[idx]) };
+                const VkResult res_buffer{ vkCreateFramebuffer(gfx.device, &buffer_info, nullptr, &gfx.frame_buffer[idx]) };
                 CGE_ASSERT(res_buffer == VK_SUCCESS);
             }
 
@@ -2142,10 +2217,10 @@ namespace cvk
                 .pNext = {},
                 .commandPool = gfx.command_pool,
                 .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-                .commandBufferCount = gfx.num_frames,
+                .commandBufferCount = gfx.frame_count,
             };
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkAllocateCommandBuffers.html
-            const VkResult res_alloc{ vkAllocateCommandBuffers(gfx.device, &alloc_info, gfx.frame_commands.data()) };
+            const VkResult res_alloc{ vkAllocateCommandBuffers(gfx.device, &alloc_info, gfx.frame_commands) };
             CGE_ASSERT(res_alloc == VK_SUCCESS);
         }
     }
