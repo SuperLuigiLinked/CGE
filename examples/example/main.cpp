@@ -79,57 +79,30 @@ void App::render([[maybe_unused]] cge::Engine& engine)
 
     constexpr double rad{ 0.75 };
     render.triangle(
-        std::array
-        {
-            cge::Vertex {
-                .xyzw = { std::cos((secs + 0.0 / 3.0) * tau) * rad, std::sin((secs + 0.0 / 3.0) * tau) * rad },
-                .st = { 0xFFFF0000 },
-            },
-            cge::Vertex {
-                .xyzw = { std::cos((secs + 1.0 / 3.0) * tau) * rad, std::sin((secs + 1.0 / 3.0) * tau) * rad },
-                .st = { 0xFF00FF00 },
-            },
-            cge::Vertex {
-                .xyzw = { std::cos((secs + 2.0 / 3.0) * tau) * rad, std::sin((secs + 2.0 / 3.0) * tau) * rad },
-                .st = { 0xFF0000FF },
-            },
+        cge::Vertex {
+            .xyzw = { std::cos((secs + 0.0 / 3.0) * tau) * rad, std::sin((secs + 0.0 / 3.0) * tau) * rad },
+            .st = { 0xFFFF0000 },
+        },
+        cge::Vertex {
+            .xyzw = { std::cos((secs + 1.0 / 3.0) * tau) * rad, std::sin((secs + 1.0 / 3.0) * tau) * rad },
+            .st = { 0xFF00FF00 },
+        },
+        cge::Vertex {
+            .xyzw = { std::cos((secs + 2.0 / 3.0) * tau) * rad, std::sin((secs + 2.0 / 3.0) * tau) * rad },
+            .st = { 0xFF0000FF },
         }
     );
 
     render.triangle(
-        std::array
-        {
-            cge::Vertex {
-                .xyzw = { -1.0f, -1.0f },
-                .st = { 0xFFFF0000 },
-            },
-            cge::Vertex {
-                .xyzw = { 0.5f, 0.0f },
-                .st = { 0x00FF0000 },
-            },
-            cge::Vertex {
-                .xyzw = { -1.0f, 1.0f },
-                .st = { 0xFFFF0000 },
-            },
-        }
+        cge::Vertex { .xyzw = { -1.0f, -1.0f }, .st = { 0xFFFF0000 }, },
+        cge::Vertex { .xyzw = {  0.5f,  0.0f }, .st = { 0x00FF0000 }, },
+        cge::Vertex { .xyzw = { -1.0f,  1.0f }, .st = { 0xFFFF0000 }, }
     );
 
     render.triangle(
-        std::array
-        {
-            cge::Vertex {
-                .xyzw = { 1.0f, -1.0f },
-                .st = { 0xFF00FF00 },
-            },
-            cge::Vertex {
-                .xyzw = { -0.5f, 0.0f },
-                .st = { 0x0000FF00 },
-            },
-            cge::Vertex {
-                .xyzw = { 1.0f, 1.0f },
-                .st = { 0xFF00FF00 },
-            },
-        }
+        cge::Vertex { .xyzw = {  1.0f, -1.0f }, .st = { 0xFF00FF00 }, },
+        cge::Vertex { .xyzw = { -0.5f,  0.0f }, .st = { 0x0000FF00 }, },
+        cge::Vertex { .xyzw = {  1.0f,  1.0f }, .st = { 0xFF00FF00 }, }
     );
 }
 

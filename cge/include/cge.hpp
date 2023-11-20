@@ -151,69 +151,69 @@ namespace cge
             self.triangle_fan_idx.clear();
         }
 
-        inline constexpr void point(const Vertex vtx)
+        inline constexpr void point(const Vertex& vtx)
         {
             self.point_vtx.push_back(vtx);
         }
 
-        inline constexpr void line(const std::span<const Vertex, 2> vtx)
+        inline constexpr void line(const Vertex& vtx_0, const Vertex& vtx_1)
         {
-            self.line_vtx.push_back(vtx[0]);
-            self.line_vtx.push_back(vtx[1]);
+            self.line_vtx.push_back(vtx_0);
+            self.line_vtx.push_back(vtx_1);
         }
 
-        inline constexpr void triangle(const std::span<const Vertex, 3> vtx)
+        inline constexpr void triangle(const Vertex& vtx_0, const Vertex& vtx_1, const Vertex& vtx_2)
         {
-            self.triangle_vtx.push_back(vtx[0]);
-            self.triangle_vtx.push_back(vtx[1]);
-            self.triangle_vtx.push_back(vtx[2]);
+            self.triangle_vtx.push_back(vtx_0);
+            self.triangle_vtx.push_back(vtx_1);
+            self.triangle_vtx.push_back(vtx_2);
         }
 
-        inline constexpr void line_strip(const std::span<const Vertex /* 2+ */> vtx)
+        inline constexpr void line_strip(const std::span<const Vertex /* 2+ */> vtx_list)
         {
-            if (vtx.size() < 2) return;
+            if (vtx_list.size() < 2) return;
 
             Index idx{ static_cast<Index>(self.line_strip_vtx.size()) };
-            for (const Vertex& v : vtx)
+            for (const Vertex& vtx : vtx_list)
             {
-                self.line_strip_vtx.push_back(v);
+                self.line_strip_vtx.push_back(vtx);
                 self.line_strip_idx.push_back(idx);
                 ++idx;
             }
             self.line_strip_idx.push_back(sentinel_idx);
         }
 
-        inline constexpr void triangle_strip(const std::span<const Vertex /* 3+ */> vtx)
+        inline constexpr void triangle_strip(const std::span<const Vertex /* 3+ */> vtx_list)
         {
-            if (vtx.size() < 3) return;
+            if (vtx_list.size() < 3) return;
 
             Index idx{ static_cast<Index>(self.triangle_strip_vtx.size()) };
-            for (const Vertex& v : vtx)
+            for (const Vertex& vtx : vtx_list)
             {
-                self.triangle_strip_vtx.push_back(v);
+                self.triangle_strip_vtx.push_back(vtx);
                 self.triangle_strip_idx.push_back(idx);
                 ++idx;
             }
             self.triangle_strip_idx.push_back(sentinel_idx);
         }
 
-        inline constexpr void triangle_fan(const std::span<const Vertex /* 3+ */> vtx)
+        inline constexpr void triangle_fan(const std::span<const Vertex /* 3+ */> vtx_list)
         {
-            if (vtx.size() < 3) return;
+            if (vtx_list.size() < 3) return;
 
         #ifdef __APPLE__
             const Index size{ static_cast<Index>(self.triangle_fan_vtx.size()) };
             for (Index idx{ 1 }; idx < size - 1; ++idx)
             {
-                self.triangle_fan_vtx.push_back(vtx[idx]);
-                self.triangle_fan_vtx.push_back(vtx[idx + 1]);
-                self.triangle_fan_vtx.push_back(vtx[0]);
+                self.triangle_fan_vtx.push_back(vtx_list[idx]);
+                self.triangle_fan_vtx.push_back(vtx_list[idx + 1]);
+                self.triangle_fan_vtx.push_back(vtx_list[0]);
             }
         #else
             Index idx{ static_cast<Index>(self.triangle_fan_vtx.size()) };
-            for (const Vertex& v : vtx)
+            for (const Vertex& vtx : vtx_list)
             {
-                self.triangle_fan_vtx.push_back(v);
+                self.triangle_fan_vtx.push_back(vtx);
                 self.triangle_fan_idx.push_back(idx);
                 ++idx;
             }
