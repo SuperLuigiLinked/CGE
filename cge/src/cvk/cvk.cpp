@@ -476,7 +476,7 @@ namespace cvk
                 .sType = VK_STRUCTURE_TYPE_METAL_SURFACE_CREATE_INFO_EXT,
                 .pNext = {},
                 .flags = {},
-                .pLayer = static_cast<const CAMetalLayer*>(cvk::create_metal_layer(gfx.window)),
+                .pLayer = static_cast<const CAMetalLayer*>(cvk::create_metal_layer(gfx.context)),
             };
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCreateMetalSurfaceEXT.html
             const VkResult res_surface{ vkCreateMetalSurfaceEXT(ctx.instance, &create_info, nullptr, &gfx.surface) };
