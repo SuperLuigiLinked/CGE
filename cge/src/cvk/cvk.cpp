@@ -261,8 +261,8 @@ namespace cvk
         }
         {
         #if defined(CGE_VALIDATE_VK)
-            CGE_ASSERT((CGE_LOAD_INSTANCE(ctx.instance, ctx.pfn, vkCreateDebugUtilsMessengerEXT)));
-            CGE_ASSERT((CGE_LOAD_INSTANCE(ctx.instance, ctx.pfn, vkDestroyDebugUtilsMessengerEXT)));
+            CGE_ASSERT((CVK_LOAD_INSTANCE(ctx.instance, ctx.pfn, vkCreateDebugUtilsMessengerEXT)));
+            CGE_ASSERT((CVK_LOAD_INSTANCE(ctx.instance, ctx.pfn, vkDestroyDebugUtilsMessengerEXT)));
         #endif
 
             CGE_LOG("[CGE] VK INSTANCE FUNCTIONS\n");
@@ -384,24 +384,30 @@ namespace cvk
 
     void destroy_context(Context& ctx)
     {
-        for (Offset idx{}; idx < ctx.device_count; ++idx)
         {
-            soa::dealloc(ctx.device_fam_array[idx], ctx.device_fam_count[idx]);
-            soa::dealloc(ctx.device_lyr_array[idx], ctx.device_lyr_count[idx]);
-            soa::dealloc(ctx.device_ext_array[idx], ctx.device_ext_count[idx]);
+            for (Offset idx{}; idx < ctx.device_count; ++idx)
+            {
+                soa::dealloc(ctx.device_fam_array[idx], ctx.device_fam_count[idx]);
+                soa::dealloc(ctx.device_lyr_array[idx], ctx.device_lyr_count[idx]);
+                soa::dealloc(ctx.device_ext_array[idx], ctx.device_ext_count[idx]);
+            }
+            soa::dealloc(ctx.device_array, ctx.device_count);
         }
-        soa::dealloc(ctx.device_array, ctx.device_count);
-
     #if defined(CGE_VALIDATE_VK)
-        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyDebugUtilsMessengerEXT.html
-        ctx.pfn.vkDestroyDebugUtilsMessengerEXT(ctx.instance, ctx.messenger, nullptr);
+        {
+            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyDebugUtilsMessengerEXT.html
+            if (ctx.messenger)
+                ctx.pfn.vkDestroyDebugUtilsMessengerEXT(ctx.instance, ctx.messenger, nullptr);
+        }
     #endif
+        {
+            soa::dealloc(ctx.instance_lyr_array, ctx.instance_lyr_count);
+            soa::dealloc(ctx.instance_ext_array, ctx.instance_ext_count);
 
-        soa::dealloc(ctx.instance_lyr_array, ctx.instance_lyr_count);
-        soa::dealloc(ctx.instance_ext_array, ctx.instance_ext_count);
-
-        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyInstance.html
-        vkDestroyInstance(ctx.instance, nullptr);
+            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyInstance.html
+            if (ctx.instance)
+                vkDestroyInstance(ctx.instance, nullptr);
+        }
     }
 }
 
@@ -482,11 +488,6 @@ namespace cvk
             CGE_LOG("[CGE] VK SURFACE\n");
         }
         {
-            update_surface_info(ctx, gfx);
-
-            CGE_LOG("[CGE] VK DEVICE SURFACE\n");
-        }
-        {
             Offset device_idx{};
             Offset graphics_idx{};
             Offset present_idx{};
@@ -497,6 +498,8 @@ namespace cvk
             const Offset device_count{ ctx.device_count };
             for (Offset di{}; di < device_count; ++di)
             {
+                cvk::update_surface_info(ctx, gfx, di);
+
                 const uint64_t rank_d{ rank_device(ctx, gfx, di) };
                 {
                     const auto& dev_props{ ctx.device_properties[di] };
@@ -541,6 +544,11 @@ namespace cvk
                 CGE_LOG("[CGE] Selected: \"{}\"\n", dev_props.deviceName);
             }
             CGE_LOG("[CGE] VK DEVICE SELECTION\n");
+        }
+        {
+            cvk::update_surface_info(ctx, gfx, gfx.sel_device);
+
+            CGE_LOG("[CGE] VK SURFACE INFO\n");
         }
         {
             static constexpr std::array graphics_prios{ 1.0f };
@@ -1167,69 +1175,103 @@ namespace cvk
         const VkResult res_wait{ vkDeviceWaitIdle(gfx.device) };
         (void)res_wait;
 
-        for (Offset idx{}; idx < gfx.atlas_count; ++idx) cvk::destroy_atlas(ctx, gfx, idx);
-        soa::dealloc(gfx.atlas_array, gfx.atlas_count);
-
-        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkFreeCommandBuffers.html
-        vkFreeCommandBuffers(gfx.device, gfx.command_pool, Offset(gfx.frame_count), gfx.frame_commands);
-        for (Offset idx{}; idx < gfx.frame_count; ++idx)
         {
-            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyFramebuffer.html
-            vkDestroyFramebuffer(gfx.device, gfx.frame_buffer[idx], nullptr);
-            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyImageView.html
-            vkDestroyImageView(gfx.device, gfx.frame_view[idx], nullptr);
-            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroySemaphore.html
-            vkDestroySemaphore(gfx.device, gfx.frame_sem_image[idx], nullptr);
-            vkDestroySemaphore(gfx.device, gfx.frame_sem_render[idx], nullptr);
-            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyFence.html
-            vkDestroyFence(gfx.device, gfx.frame_fence[idx], nullptr);
+            for (Offset idx{}; idx < gfx.atlas_count; ++idx)
+            {
+                cvk::destroy_atlas(ctx, gfx, idx);
+            }
+            soa::dealloc(gfx.atlas_array, gfx.atlas_count);
         }
-        soa::dealloc(gfx.frame_array, gfx.frame_count);
-        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroySwapchainKHR.html
-        vkDestroySwapchainKHR(gfx.device, gfx.swapchain, nullptr);
+        {
+            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkFreeCommandBuffers.html
+            if (gfx.frame_commands)
+                vkFreeCommandBuffers(gfx.device, gfx.command_pool, Offset(gfx.frame_count), gfx.frame_commands);
+            for (Offset idx{}; idx < gfx.frame_count; ++idx)
+            {
+                // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyFramebuffer.html
+                if (gfx.frame_buffer[idx])
+                    vkDestroyFramebuffer(gfx.device, gfx.frame_buffer[idx], nullptr);
+                // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyImageView.html
+                if (gfx.frame_view[idx])
+                    vkDestroyImageView(gfx.device, gfx.frame_view[idx], nullptr);
+                // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroySemaphore.html
+                if (gfx.frame_sem_image[idx])
+                    vkDestroySemaphore(gfx.device, gfx.frame_sem_image[idx], nullptr);
+                if (gfx.frame_sem_render[idx])
+                    vkDestroySemaphore(gfx.device, gfx.frame_sem_render[idx], nullptr);
+                // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyFence.html
+                if (gfx.frame_fence[idx])
+                    vkDestroyFence(gfx.device, gfx.frame_fence[idx], nullptr);
+            }
+            soa::dealloc(gfx.frame_array, gfx.frame_count);
+            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroySwapchainKHR.html
+            if (gfx.swapchain)
+                vkDestroySwapchainKHR(gfx.device, gfx.swapchain, nullptr);
+        }
+        {
+            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyPipeline.html
+            for (const VkPipeline pipeline : gfx.pipelines_graphics)
+            {
+                if (pipeline)
+                    vkDestroyPipeline(gfx.device, pipeline, nullptr);
+            }
+            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyDescriptorPool.html
+            if (gfx.descriptor_pool)
+                vkDestroyDescriptorPool(gfx.device, gfx.descriptor_pool, nullptr);
+            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyDescriptorSetLayout.html
+            if (gfx.descriptor_layout)
+                vkDestroyDescriptorSetLayout(gfx.device, gfx.descriptor_layout, nullptr);
+            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyPipelineLayout.html
+            if (gfx.pipeline_layout)
+                vkDestroyPipelineLayout(gfx.device, gfx.pipeline_layout, nullptr);
+            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyRenderPass.html
+            if (gfx.render_pass)
+                vkDestroyRenderPass(gfx.device, gfx.render_pass, nullptr);
+            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyShaderModule.html
+            if (gfx.module_fragment)
+                vkDestroyShaderModule(gfx.device, gfx.module_fragment, nullptr);
+            if (gfx.module_vertex)
+                vkDestroyShaderModule(gfx.device, gfx.module_vertex, nullptr);
+            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyCommandPool.html
+            if (gfx.command_pool)
+                vkDestroyCommandPool(gfx.device, gfx.command_pool, nullptr);
+        }
+        {
+            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyBuffer.html
+            if (gfx.buffer_stg)
+                vkDestroyBuffer(gfx.device, gfx.buffer_stg, nullptr);
+            if (gfx.buffer_idx)
+                vkDestroyBuffer(gfx.device, gfx.buffer_idx, nullptr);
+            if (gfx.buffer_vtx)
+                vkDestroyBuffer(gfx.device, gfx.buffer_vtx, nullptr);
+            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkFreeMemory.html
+            if (gfx.buffer_memory)
+                vkFreeMemory(gfx.device, gfx.buffer_memory, nullptr);
+        }
+        {
+            soa::dealloc(gfx.ds_formats_array, gfx.ds_formats_count);
+            soa::dealloc(gfx.ds_present_array, gfx.ds_present_count);
 
-        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyPipeline.html
-        for (const VkPipeline pipeline : gfx.pipelines_graphics) vkDestroyPipeline(gfx.device, pipeline, nullptr);
-        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyDescriptorPool.html
-        vkDestroyDescriptorPool(gfx.device, gfx.descriptor_pool, nullptr);
-        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyDescriptorSetLayout.html
-        vkDestroyDescriptorSetLayout(gfx.device, gfx.descriptor_layout, nullptr);
-        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyPipelineLayout.html
-        vkDestroyPipelineLayout(gfx.device, gfx.pipeline_layout, nullptr);
-        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyRenderPass.html
-        vkDestroyRenderPass(gfx.device, gfx.render_pass, nullptr);
-        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyShaderModule.html
-        vkDestroyShaderModule(gfx.device, gfx.module_fragment, nullptr);
-        vkDestroyShaderModule(gfx.device, gfx.module_vertex, nullptr);
+            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyDevice.html        
+            if (gfx.device)
+                vkDestroyDevice(gfx.device, nullptr);
 
-        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyCommandPool.html
-        vkDestroyCommandPool(gfx.device, gfx.command_pool, nullptr);
-
-        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyBuffer.html
-        vkDestroyBuffer(gfx.device, gfx.buffer_stg, nullptr);
-        vkDestroyBuffer(gfx.device, gfx.buffer_idx, nullptr);
-        vkDestroyBuffer(gfx.device, gfx.buffer_vtx, nullptr);
-        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkFreeMemory.html
-        vkFreeMemory(gfx.device, gfx.buffer_memory, nullptr);
-
-        soa::dealloc(gfx.ds_formats_array, gfx.ds_formats_count);
-        soa::dealloc(gfx.ds_present_array, gfx.ds_present_count);
-
-        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroySurfaceKHR.html
-        vkDestroySurfaceKHR(ctx.instance, gfx.surface, nullptr);
-
-        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyDevice.html        
-        vkDestroyDevice(gfx.device, nullptr);
+            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroySurfaceKHR.html
+            if (gfx.surface)
+                vkDestroySurfaceKHR(ctx.instance, gfx.surface, nullptr);
+        }
     }
 }
 
 namespace cvk
 {
-    void upload_texture(Context& ctx, Renderable& gfx, const std::size_t atlas_idx, cge::Texture texture)
+    void upload_texture(Context& ctx, Renderable& gfx, const Offset atlas_idx, cge::Texture texture)
     {
         CGE_ASSERT(atlas_idx < gfx.atlas_count);
 
         if (texture.empty()) texture = default_texture;
+
+        cvk::destroy_atlas(ctx, gfx, atlas_idx);
 
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkExtent3D.html
         const VkExtent3D tex_extent{ .width = texture.width, .height = texture.height, .depth = 1 };
@@ -1535,16 +1577,20 @@ namespace cvk
     void destroy_atlas(Context& ctx [[maybe_unused]], Renderable& gfx, const Offset atlas_idx)
     {
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroySampler.html
-        vkDestroySampler(gfx.device, gfx.atlas_sampler[atlas_idx], nullptr);
+        if (gfx.atlas_sampler[atlas_idx])
+            vkDestroySampler(gfx.device, gfx.atlas_sampler[atlas_idx], nullptr);
 
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyImageView.html
-        vkDestroyImageView(gfx.device, gfx.atlas_view[atlas_idx], nullptr);
+        if (gfx.atlas_view[atlas_idx])
+            vkDestroyImageView(gfx.device, gfx.atlas_view[atlas_idx], nullptr);
 
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyImage.html
-        vkDestroyImage(gfx.device, gfx.atlas_image[atlas_idx], nullptr);
+        if (gfx.atlas_image[atlas_idx])
+            vkDestroyImage(gfx.device, gfx.atlas_image[atlas_idx], nullptr);
 
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkFreeMemory.html
-        vkFreeMemory(gfx.device, gfx.atlas_memory[atlas_idx], nullptr);
+        if (gfx.atlas_memory[atlas_idx])
+            vkFreeMemory(gfx.device, gfx.atlas_memory[atlas_idx], nullptr);
     }
 }
 
@@ -2018,11 +2064,10 @@ namespace cvk
 
 namespace cvk
 {
-    void update_surface_info(Context& ctx, Renderable& gfx)
+    void update_surface_info(Context& ctx, Renderable& gfx, const Offset device_idx)
     {
-        VkPhysicalDevice& device{ ctx.devices[gfx.sel_device] };
+        VkPhysicalDevice& device{ ctx.devices[device_idx] };
         VkSurfaceKHR& surface{ gfx.surface };
-
         {
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceSurfacePresentModesKHR.html
             Offset count;

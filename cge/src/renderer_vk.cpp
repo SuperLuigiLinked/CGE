@@ -55,7 +55,6 @@ namespace cge
         if (window)
         {
             cvk::create_renderable(self.ctx, self.gfx, window, engine.game_settings.vsync);
-            cvk::upload_texture(self.ctx, self.gfx, 0, cvk::default_texture);
         }
     }
 
@@ -68,7 +67,7 @@ namespace cge
 
             if (cge::quitting(engine)) return;
 
-            cvk::update_surface_info(self.ctx, self.gfx);
+            cvk::update_surface_info(self.ctx, self.gfx, self.gfx.sel_device);
             cvk::remake_swapchain(self.ctx, self.gfx, engine.cached_vsync);
 
             // if ((self.surface_size.width == 0) || (self.surface_size.height == 0)) return;

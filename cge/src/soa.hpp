@@ -6,6 +6,7 @@
 #pragma once
 
 #include <cstdlib>
+#include <array>
 
 namespace soa
 {
@@ -37,32 +38,20 @@ namespace soa
     template <typename data_t, typename count_t, typename... Types>
     extern bool realloc(data_t*& data, count_t& count, const count_t new_count, Types*&... ptrs) noexcept
     {
-        if (new_count == count)
+        if (new_count <= count)
         {
-            return true;
-        }
-        else if (new_count == 0)
-        {
-            count = 0;
-            return true;
-        }
-        else if constexpr (sizeof...(Types) == 0)
-        {
-            const addr_t alloc_size{ new_count * sizeof(data_t) };
-
-            void* const old_data{ static_cast<void*>(data) };
-            void* const new_data{ std::realloc(old_data, alloc_size) };
-            if (new_data == nullptr) return false;
-
-            data = static_cast<data_t*>(new_data);
             count = new_count;
-
             return true;
         }
         else
         {
             addr_t alloc_size{};
-            const addr_t offsets[sizeof...(Types)] { soa::alloc_one<Types>(alloc_size, addr_t(new_count))... };
+            std::array<addr_t, sizeof...(Types)> offsets;
+
+            if constexpr (sizeof...(Types) > 0)
+                offsets = { soa::alloc_one<Types>(alloc_size, addr_t(new_count))... };
+            else
+                alloc_size = new_count * sizeof(data_t);
 
             void* const old_data{ static_cast<void*>(data) };
             void* const new_data{ std::realloc(old_data, alloc_size) };
@@ -71,8 +60,11 @@ namespace soa
             data = static_cast<data_t*>(new_data);
             count = new_count;
 
-            const addr_t* offset{ offsets };
-            (..., soa::offset_one(addr_t(data), offset, ptrs));
+            if constexpr (sizeof...(Types) > 0)
+            {
+                const addr_t* offset{ offsets.data() };
+                (..., soa::offset_one(addr_t(data), offset, ptrs));
+            }
 
             return true;
         }

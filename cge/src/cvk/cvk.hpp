@@ -228,9 +228,9 @@ namespace cvk
     extern void create_renderable(cvk::Context& ctx, cvk::Renderable& gfx, wyn_window_t window, bool vsync);
     extern void destroy_renderable(cvk::Context& ctx, cvk::Renderable& gfx);
 
-    extern void upload_texture(cvk::Context& ctx, cvk::Renderable& gfx, std::size_t atlas_idx, cge::Texture tex);
+    extern void upload_texture(cvk::Context& ctx, cvk::Renderable& gfx, Offset atlas_idx, cge::Texture tex);
 
     extern bool render_frame(cvk::Context& ctx, cvk::Renderable& gfx, const cge::Primitives& prims, unsigned attempts);
-    extern void update_surface_info(cvk::Context& ctx, cvk::Renderable& gfx);
+    extern void update_surface_info(cvk::Context& ctx, cvk::Renderable& gfx, Offset device_idx);
     extern void remake_swapchain(cvk::Context& ctx, cvk::Renderable& gfx, bool vsync);
 }
