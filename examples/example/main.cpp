@@ -74,21 +74,23 @@ void App::render([[maybe_unused]] cge::Engine& engine)
     );
     //render.clear(0xFF000040);
 
-    constexpr double pi{ std::numbers::pi };
-    constexpr double tau{ pi + pi };
+    constexpr float pi{ std::numbers::pi_v<float> };
+    constexpr float tau{ pi + pi };
+    
+    constexpr float rad{ 0.75f };
+    const float rot{ float(secs) };
 
-    constexpr double rad{ 0.75 };
     render.triangle(
         cge::Vertex {
-            .xyzw = { std::cos((secs + 0.0 / 3.0) * tau) * rad, std::sin((secs + 0.0 / 3.0) * tau) * rad },
+            .xyzw = { std::cos((rot + 0.0f / 3.0f) * tau) * rad, std::sin((rot + 0.0f / 3.0f) * tau) * rad },
             .st = { 0xFFFF0000 },
         },
         cge::Vertex {
-            .xyzw = { std::cos((secs + 1.0 / 3.0) * tau) * rad, std::sin((secs + 1.0 / 3.0) * tau) * rad },
+            .xyzw = { std::cos((rot + 1.0f / 3.0f) * tau) * rad, std::sin((rot + 1.0f / 3.0f) * tau) * rad },
             .st = { 0xFF00FF00 },
         },
         cge::Vertex {
-            .xyzw = { std::cos((secs + 2.0 / 3.0) * tau) * rad, std::sin((secs + 2.0 / 3.0) * tau) * rad },
+            .xyzw = { std::cos((rot + 2.0f / 3.0f) * tau) * rad, std::sin((rot + 2.0f / 3.0f) * tau) * rad },
             .st = { 0xFF0000FF },
         }
     );
