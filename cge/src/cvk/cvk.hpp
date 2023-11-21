@@ -4,6 +4,9 @@
 
 #pragma once
 
+// #undef CGE_DEBUG
+// #undef CGE_VALIDATE_VK
+
 #if defined(WYN_WIN32)
     #define VK_USE_PLATFORM_WIN32_KHR
 #elif defined(WYN_COCOA)
@@ -102,6 +105,7 @@ namespace cvk
 namespace cvk
 {
     using Offset = std::uint32_t;
+    using Ranking = std::uint64_t;
 
     static inline constexpr cge::Color default_color{};
     static inline constexpr cge::Texture default_texture{ .width = 1, .height = 1, .data = &default_color };
@@ -152,9 +156,9 @@ namespace cvk
         VkSurfaceKHR surface        ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSurfaceKHR.html
         VkExtent2D   surface_extent ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkExtent2D.html
 
-        Offset   sel_device        ;
-        Offset   sel_queue_graphics;
-        Offset   sel_queue_present ;
+        Offset   sel_device  ;
+        Offset   sel_graphics;
+        Offset   sel_present ;
         VkDevice device            ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDevice.html
         VkQueue  queue_graphics    ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkQueue.html
         VkQueue  queue_present     ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkQueue.html
