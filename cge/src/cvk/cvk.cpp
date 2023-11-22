@@ -448,7 +448,7 @@ namespace cvk
                 .pNext = {},
                 .flags = {},
                 .dpy = static_cast<Display*>(gfx.context),
-                .window = static_cast<Window>(static_cast<std::uintptr_t>(gfx.window)),
+                .window = static_cast<Window>(std::uintptr_t(gfx.window)),
             };
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCreateXlibSurfaceKHR.html
             const VkResult res_surface{ vkCreateXlibSurfaceKHR(ctx.instance, &create_info, ctx.allocator, &gfx.surface) };
@@ -459,7 +459,7 @@ namespace cvk
                 .pNext = {},
                 .flags = {},
                 .connection = static_cast<xcb_connection_t*>(gfx.context),
-                .window = static_cast<xcb_window_t>(static_cast<std::uintptr_t>(gfx.window)),
+                .window = static_cast<xcb_window_t>(std::uintptr_t(gfx.window)),
             };
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCreateXcbSurfaceKHR.html
             const VkResult res_surface{ vkCreateXcbSurfaceKHR(ctx.instance, &create_info, ctx.allocator, &gfx.surface) };
