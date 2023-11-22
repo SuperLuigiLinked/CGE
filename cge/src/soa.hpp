@@ -6,23 +6,28 @@
 #pragma once
 
 #include <cstdlib>
-#include <array>
 
 namespace soa
 {
-    using addr_t = decltype(sizeof(int));
+    using Address = decltype(sizeof(int));
 
     template <typename T>
-    static inline constexpr addr_t alloc_one(addr_t& addr, const addr_t count) noexcept
+    static inline constexpr Address suballoc(Address& addr, const Address count) noexcept
     {
-        const addr_t realign{ (alignof(T) - (addr % alignof(T))) % alignof(T) };
-        const addr_t base{ addr + realign };
+        const Address realign{ (alignof(T) - (addr % alignof(T))) % alignof(T) };
+        const Address base{ addr + realign };
         addr = base + count * sizeof(T);
         return base;
     }
 
+    template <>
+    inline constexpr Address suballoc<void>(Address& addr, const Address count [[maybe_unused]]) noexcept
+    {
+        return addr;
+    }
+
     template <typename T>
-    static inline void offset_one(const addr_t addr, const addr_t*& offset, T*& ptr) noexcept
+    static inline void offset(const Address addr, const Address*& offset, T*& ptr) noexcept
     {
         ptr = reinterpret_cast<T*>(addr + *offset);
         ++offset;
@@ -35,8 +40,8 @@ namespace soa
      * @see C:
      * - https://en.cppreference.com/w/cpp/memory/c/realloc
      */
-    template <typename data_t, typename count_t, typename... Types>
-    extern bool realloc(data_t*& data, count_t& count, const count_t new_count, Types*&... ptrs) noexcept
+    template <typename Count, typename Data, typename... Subdata>
+    extern bool realloc(const Count new_count, Count& count, Data*& data, Subdata*&... subdata) noexcept
     {
         if (new_count <= count)
         {
@@ -45,25 +50,24 @@ namespace soa
         }
         else
         {
-            addr_t alloc_size{};
-            std::array<addr_t, sizeof...(Types)> offsets;
-
-            if constexpr (sizeof...(Types) > 0)
-                offsets = { soa::alloc_one<Types>(alloc_size, addr_t(new_count))... };
-            else
-                alloc_size = new_count * sizeof(data_t);
+            Address alloc_size{};
+            const Address offsets[]{
+                soa::suballoc<Data>(alloc_size, Address(new_count)),
+                soa::suballoc<Subdata>(alloc_size, Address(new_count))...
+            };
+            if (alloc_size == 0) return false;
 
             void* const old_data{ static_cast<void*>(data) };
             void* const new_data{ std::realloc(old_data, alloc_size) };
             if (new_data == nullptr) return false;
 
-            data = static_cast<data_t*>(new_data);
             count = new_count;
+            data = static_cast<Data*>(new_data);
 
-            if constexpr (sizeof...(Types) > 0)
+            if constexpr (sizeof...(Subdata) > 0)
             {
-                const addr_t* offset{ offsets.data() };
-                (..., soa::offset_one(addr_t(data), offset, ptrs));
+                const Address* offset{ offsets + 1 };
+                (..., soa::offset(Address(data), offset, subdata));
             }
 
             return true;
@@ -74,8 +78,8 @@ namespace soa
      * @see C:
      * - https://en.cppreference.com/w/cpp/memory/c/free
      */
-    template <typename data_t, typename count_t>
-    static inline void dealloc(data_t*& data, count_t& count) noexcept
+    template <typename Count, typename Data>
+    static inline void dealloc(Count& count, Data*& data) noexcept
     {
         std::free(static_cast<void*>(data));
         data = nullptr;

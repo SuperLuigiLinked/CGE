@@ -60,18 +60,34 @@ namespace cge
 
     void Renderer_VK::render(Engine& engine)
     {
-        for (unsigned attempts{}; attempts < 10; ++attempts)
-        {
-            const bool res_render{ cvk::render_frame(self.ctx, self.gfx, engine.primitives(), attempts) };
-            if (res_render) return;
+        constexpr unsigned max_attempts{ 5 };
 
+        for (unsigned attempts{}; attempts < max_attempts; ++attempts)
+        {
+            const VkResult res_render{ cvk::render_frame(self.ctx, self.gfx, engine.primitives()) };
+            if (res_render == VK_SUCCESS) return;
             if (cge::quitting(engine)) return;
 
-            cvk::update_surface_info(self.ctx, self.gfx, self.gfx.sel_device);
-            cvk::remake_swapchain(self.ctx, self.gfx, engine.cached_vsync);
-
-            // if ((self.surface_size.width == 0) || (self.surface_size.height == 0)) return;
+            if (attempts > 0)
+                CGE_LOG("[CGE] RENDER {} : VkResult {}\n", attempts, +res_render);
+            
+            if (res_render == VK_ERROR_OUT_OF_DATE_KHR)
+            {
+                cvk::update_surface_info(self.ctx, self.gfx, self.gfx.sel_device);
+                if (!(self.gfx.ds_capabilities.currentExtent.width && self.gfx.ds_capabilities.currentExtent.height)) return;
+                cvk::remake_swapchain(self.ctx, self.gfx, engine.cached_vsync);
+                continue;
+            }
+            else if (res_render == VK_SUBOPTIMAL_KHR)
+            {
+                cvk::update_surface_info(self.ctx, self.gfx, self.gfx.sel_device);
+                if (!(self.gfx.ds_capabilities.currentExtent.width && self.gfx.ds_capabilities.currentExtent.height)) return;
+                cvk::remake_swapchain(self.ctx, self.gfx, engine.cached_vsync);
+                return;
+            }
+            else
+                CGE_ASSERT(res_render == VK_SUCCESS);
         }
-        CGE_LOG("[CGE] RENDER ABORTING...\n");
+        CGE_LOG("[CGE] RENDER FAILED {} TIMES. ABORTING...\n", max_attempts);
     }
 }

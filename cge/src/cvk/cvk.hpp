@@ -59,46 +59,39 @@ namespace cvk
 {
     static inline constexpr std::array req_instance_extensions{
     #ifdef __APPLE__
-        "VK_KHR_portability_enumeration", ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_KHR_portability_enumeration.html
-        "VK_KHR_get_physical_device_properties2", ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_KHR_get_physical_device_properties2.html
+        VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME, ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_KHR_portability_enumeration.html
+        VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME, ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_KHR_get_physical_device_properties2.html
     #endif
-        "VK_KHR_surface", ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_KHR_surface.html
+        VK_KHR_SURFACE_EXTENSION_NAME, ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_KHR_surface.html
     #if defined(WYN_WIN32)
-        "VK_KHR_win32_surface", ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_KHR_win32_surface.html
+        VK_KHR_WIN32_SURFACE_EXTENSION_NAME, ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_KHR_win32_surface.html
     #elif defined(WYN_XLIB)
-        "VK_KHR_xlib_surface", ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_KHR_xlib_surface.html
+        VK_KHR_XLIB_SURFACE_EXTENSION_NAME, ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_KHR_xlib_surface.html
     #elif defined(WYN_XCB)
-        "VK_KHR_xcb_surface", ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_KHR_xcb_surface.html
+        VK_KHR_XCB_SURFACE_EXTENSION_NAME, ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_KHR_xcb_surface.html
     #elif defined(WYN_WAYLAND)
-        "VK_KHR_wayland_surface", ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_KHR_wayland_surface.html
+        VK_KHR_WAYLAND_SURFACE_EXTENSION_NAME, ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_KHR_wayland_surface.html
     #elif defined(WYN_COCOA)
-        "VK_EXT_metal_surface", ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_EXT_metal_surface.html
-    #else
-        #error "Unimplemented"
+        VK_EXT_METAL_SURFACE_EXTENSION_NAME, ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_EXT_metal_surface.html
     #endif
     #if defined(CGE_VALIDATE_VK)
-        "VK_EXT_debug_utils", ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_EXT_debug_utils.html
+        VK_EXT_DEBUG_UTILS_EXTENSION_NAME, ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_EXT_debug_utils.html
     #endif
     };
 
     static inline constexpr std::array req_device_extensions{
     #ifdef __APPLE__
-        "VK_KHR_portability_subset", ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_KHR_portability_subset.html
+        VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME, ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_KHR_portability_subset.html
     #endif
-        "VK_KHR_swapchain", ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_KHR_swapchain.html
+        VK_KHR_SWAPCHAIN_EXTENSION_NAME, ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_KHR_swapchain.html
     };
 
 #if defined(CGE_VALIDATE_VK)    
-    static inline constexpr std::array req_instance_layers{
-        "VK_LAYER_KHRONOS_validation", ///< https://vulkan.lunarg.com/doc/view/1.3.204.1/windows/khronos_validation_layer.html
-    };
-    
-    static inline constexpr std::array req_device_layers{
+    static inline constexpr std::array req_layers{
         "VK_LAYER_KHRONOS_validation", ///< https://vulkan.lunarg.com/doc/view/1.3.204.1/windows/khronos_validation_layer.html
     };
 #else
-    static inline constexpr std::array<const char*, 0> req_instance_layers{};
-    static inline constexpr std::array<const char*, 0> req_device_layers{};
+    static inline constexpr std::array<const char*, 0> req_layers{};
 #endif
 }
 
@@ -121,19 +114,21 @@ namespace cvk
     struct Context
     {
         InstanceFunctions pfn;
+        
+        VkAllocationCallbacks* allocator;
 
         VkInstance             instance          ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkInstance.html
+    #if defined(CGE_DEBUG)
         Offset                 instance_ext_count;
         Offset                 instance_lyr_count;
         VkExtensionProperties* instance_ext_array; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkExtensionProperties.html
         VkLayerProperties*     instance_lyr_array; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkLayerProperties.html
-
+    #endif
     #if defined(CGE_VALIDATE_VK)
         VkDebugUtilsMessengerEXT messenger; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDebugUtilsMessengerEXT.html
     #endif
 
         Offset device_count;
-        void*  device_array;
         VkPhysicalDevice*                 devices          ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDevice.html
         Offset*                           device_ext_count ;
         Offset*                           device_lyr_count ;
@@ -159,9 +154,9 @@ namespace cvk
         Offset   sel_device  ;
         Offset   sel_graphics;
         Offset   sel_present ;
-        VkDevice device            ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDevice.html
-        VkQueue  queue_graphics    ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkQueue.html
-        VkQueue  queue_present     ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkQueue.html
+        VkDevice device        ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDevice.html
+        VkQueue  queue_graphics; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkQueue.html
+        VkQueue  queue_present ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkQueue.html
 
         Offset                   ds_present_count;
         Offset                   ds_formats_count;
@@ -187,11 +182,10 @@ namespace cvk
         VkCommandPool         command_pool          ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkCommandPool.html
 
         Offset atlas_count;
-        void*  atlas_array;
-        VkExtent2D*           atlas_extent ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkExtent2D.html
         VkImage*              atlas_image  ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkImage.html
         VkImageView*          atlas_view   ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkImageView.html
         VkSampler*            atlas_sampler; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSampler.html
+        VkExtent2D*           atlas_extent ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkExtent2D.html
         VkDeviceMemory*       atlas_memory ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDeviceMemory.html
         VkMemoryRequirements* atlas_memreqs; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkMemoryRequirements
 
@@ -207,14 +201,13 @@ namespace cvk
         VkSwapchainKHR   swapchain       ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSwapchainKHR.html
         Offset           frame_idx       ;
         Offset           frame_count     ;
-        void*            frame_array     ;
-        VkFence*         frame_fence     ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkFence.html
-        VkSemaphore*     frame_sem_render; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSemaphore.html
-        VkSemaphore*     frame_sem_image ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSemaphore.html
         VkImage*         frame_image     ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkImage.html
         VkImageView*     frame_view      ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkImageView.html
         VkFramebuffer*   frame_buffer    ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkFramebuffer.html
         VkCommandBuffer* frame_commands  ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkCommandBuffer.html
+        VkFence*         frame_fence     ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkFence.html
+        VkSemaphore*     frame_sem_render; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSemaphore.html
+        VkSemaphore*     frame_sem_image ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSemaphore.html
     };
 
     struct Vulkan
@@ -226,15 +219,15 @@ namespace cvk
 
 namespace cvk
 {
-    extern void create_context(cvk::Context& ctx);
-    extern void destroy_context(cvk::Context& ctx);
+    extern void create_context(cvk::Context& ctx) noexcept;
+    extern void destroy_context(cvk::Context& ctx) noexcept;
 
-    extern void create_renderable(cvk::Context& ctx, cvk::Renderable& gfx, wyn_window_t window, bool vsync);
-    extern void destroy_renderable(cvk::Context& ctx, cvk::Renderable& gfx);
+    extern void create_renderable(cvk::Context& ctx, cvk::Renderable& gfx, wyn_window_t window, bool vsync) noexcept;
+    extern void destroy_renderable(cvk::Context& ctx, cvk::Renderable& gfx) noexcept;
 
-    extern void upload_texture(cvk::Context& ctx, cvk::Renderable& gfx, Offset atlas_idx, cge::Texture tex);
+    extern void upload_texture(cvk::Context& ctx, cvk::Renderable& gfx, Offset atlas_idx, cge::Texture tex) noexcept;
 
-    extern bool render_frame(cvk::Context& ctx, cvk::Renderable& gfx, const cge::Primitives& prims, unsigned attempts);
-    extern void update_surface_info(cvk::Context& ctx, cvk::Renderable& gfx, Offset device_idx);
-    extern void remake_swapchain(cvk::Context& ctx, cvk::Renderable& gfx, bool vsync);
+    extern VkResult render_frame(cvk::Context& ctx, cvk::Renderable& gfx, const cge::Primitives& prims) noexcept;
+    extern void update_surface_info(cvk::Context& ctx, cvk::Renderable& gfx, Offset device_idx) noexcept;
+    extern void remake_swapchain(cvk::Context& ctx, cvk::Renderable& gfx, bool vsync) noexcept;
 }
