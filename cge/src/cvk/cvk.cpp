@@ -2052,11 +2052,11 @@ namespace cvk
         constexpr cvk::Offset special_value{ 0xFFFFFFFF };
         
         if ((caps.currentExtent.width == special_value) && (caps.currentExtent.height == special_value)) return size;
-        
-        return {
-            .width = std::clamp(size.width, caps.minImageExtent.width, caps.maxImageExtent.width),
-            .height = std::clamp(size.height, caps.minImageExtent.height, caps.maxImageExtent.height),
-        };
+        return caps.currentExtent;        
+        // return {
+        //     .width = std::clamp(size.width, caps.minImageExtent.width, caps.maxImageExtent.width),
+        //     .height = std::clamp(size.height, caps.minImageExtent.height, caps.maxImageExtent.height),
+        // };
     }
 }
 
@@ -2074,9 +2074,9 @@ namespace cvk
 
         cvk::Offset image_idx;
         const VkResult res_acquire{ cvk::acquire_image(gfx, image_idx, image_acquired, std::array{ this_available, prev_available }, std::array{ this_available }) };
-        if (res_acquire != VK_SUCCESS)
+        if (res_acquire < VK_SUCCESS)
         {
-            // CGE_LOG("[CGE] Render failed. (Could not acquire image)\n");
+            CGE_LOG("[CGE] Render failed. (Could not acquire image)\n");
             return res_acquire;
         }
         gfx.frame_idx = (gfx.frame_idx + 1) % gfx.frame_count;
@@ -2090,24 +2090,26 @@ namespace cvk
         const VkResult res_record{ cvk::record_commands(gfx, image_idx, prims) };
         if (res_record != VK_SUCCESS)
         {
-            // CGE_LOG("[CGE] Render failed. (Could not record commands)\n");
+            CGE_LOG("[CGE] Render failed. (Could not record commands)\n");
             return res_record;
         }
 
         const VkResult res_submit{ cvk::submit_commands(gfx, image_idx, std::array{ image_acquired }, std::array{ render_finished }, this_available) };
         if (res_submit != VK_SUCCESS)
         {
-            // CGE_LOG("[CGE] Render failed. (Could not submit commands)\n");
+            CGE_LOG("[CGE] Render failed. (Could not submit commands)\n");
             return res_submit;
         }
 
         const VkResult res_present{ cvk::present_image(gfx, image_idx, std::array{ render_finished }) };
-        if (res_present != VK_SUCCESS)
+        if (res_present < VK_SUCCESS)
         {
-            // CGE_LOG("[CGE] Render failed. (Could not present image)\n");
+            CGE_LOG("[CGE] Render failed. (Could not present image)\n");
             return res_present;
         }
 
+        if (res_present > VK_SUCCESS) return res_present;
+        if (res_acquire > VK_SUCCESS) return res_acquire;
         return VK_SUCCESS;
     }
 
@@ -2121,13 +2123,13 @@ namespace cvk
 
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkAcquireNextImageKHR.html
         const VkResult res_acquire{ vkAcquireNextImageKHR(gfx.device, gfx.swapchain, no_timeout, signal_sem, VK_NULL_HANDLE, &acquired_idx) };
-        if (res_acquire != VK_SUCCESS) return res_acquire;
+        if (res_acquire < VK_SUCCESS) return res_acquire;
 
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkResetFences.html
         const VkResult res_reset{ vkResetFences(gfx.device, static_cast<cvk::Offset>(reset_fences.size()), reset_fences.data()) };
         if (res_reset != VK_SUCCESS) return res_reset;
 
-        return VK_SUCCESS;
+        return res_acquire;
     }
 
     VkResult record_commands(cvk::Renderable& gfx, const cvk::Offset frame_idx, const cge::Primitives& prims) noexcept
@@ -2142,7 +2144,7 @@ namespace cvk
 
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkExtent2D.html
         const VkExtent2D ideal_res{ cvk::ideal_resolution(gfx.surface_extent, gfx.ds_capabilities) };
-        const VkExtent2D image_res{ .width = (ideal_res.width ? ideal_res.width : 1 ), .height = (ideal_res.height ? ideal_res.height : 1 ) };
+        const VkExtent2D image_res{ .width = std::max(ideal_res.width, 1u), .height = std::max(ideal_res.height, 1u) };
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkViewport.html
         const VkViewport viewport{
             .x = 0.0f,
@@ -2421,17 +2423,6 @@ namespace cvk
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkQueuePresentKHR.html
         const VkResult res_present{ vkQueuePresentKHR(gfx.queue_present, &present_info) };
         
-        if (res_present == VK_SUBOPTIMAL_KHR)
-        {
-        #ifndef __APPLE__
-            return res_present;
-        #endif
-        }
-        else if (res_present != VK_SUCCESS)
-        {
-            return res_present;
-        }
-
-        return VK_SUCCESS;
+        return res_present;
     }
 }

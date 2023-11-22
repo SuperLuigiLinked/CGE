@@ -21,7 +21,10 @@
     #define VK_USE_PLATFORM_WAYLAND_KHR
 #endif
 #include <vulkan/vulkan.h>
-#ifdef _WIN32
+#if defined(__APPLE__)
+    #include <vulkan/vulkan_beta.h>
+#endif
+#if defined(_WIN32)
     #define _CRT_SECURE_NO_WARNINGS
     #undef min
     #undef max
@@ -58,7 +61,7 @@ namespace cvk
 namespace cvk
 {
     static inline constexpr std::array req_instance_extensions{
-    #ifdef __APPLE__
+    #if defined(__APPLE__)
         VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME, ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_KHR_portability_enumeration.html
         VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME, ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_KHR_get_physical_device_properties2.html
     #endif
@@ -80,7 +83,7 @@ namespace cvk
     };
 
     static inline constexpr std::array req_device_extensions{
-    #ifdef __APPLE__
+    #if defined(__APPLE__)
         VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME, ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_KHR_portability_subset.html
     #endif
         VK_KHR_SWAPCHAIN_EXTENSION_NAME, ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_KHR_swapchain.html

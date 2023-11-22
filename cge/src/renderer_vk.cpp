@@ -69,30 +69,18 @@ namespace cge
             if (cge::quitting(engine)) return;
 
             cvk::update_surface_info(self.ctx, self.gfx, self.gfx.sel_device);
-            {
-                const auto& caps{ self.gfx.ds_capabilities };
-                CGE_LOG("[CGE] | Cur: {}x{} | Min: {}x{} | Max: {}x{} | Img: ({}, {}) | T: ({:X}, {:X}) | L: {} | A: {:X} |\n",
-                    caps.currentExtent.width, caps.currentExtent.height,
-                    caps.minImageExtent.width, caps.minImageExtent.height,
-                    caps.maxImageExtent.width, caps.maxImageExtent.height,
-                    caps.minImageCount, caps.maxImageCount,
-                    +caps.supportedTransforms, +caps.currentTransform,
-                    caps.maxImageArrayLayers, +caps.supportedCompositeAlpha
-                );
-            }
             if (!(self.gfx.ds_capabilities.currentExtent.width && self.gfx.ds_capabilities.currentExtent.height)) return;
+            cvk::remake_swapchain(self.ctx, self.gfx, engine.cached_vsync);
 
             if (attempts > 0)
                 CGE_LOG("[CGE] RENDER {} : VkResult {}\n", attempts, +res_render);
             
             if (res_render == VK_ERROR_OUT_OF_DATE_KHR)
             {
-                cvk::remake_swapchain(self.ctx, self.gfx, engine.cached_vsync);
                 continue;
             }
             else if (res_render == VK_SUBOPTIMAL_KHR)
             {
-                cvk::remake_swapchain(self.ctx, self.gfx, engine.cached_vsync);
                 return;
             }
             else
