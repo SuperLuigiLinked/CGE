@@ -15,7 +15,7 @@
 #include <vector>
 #include <string>
 
-#if 1
+#if 0
     #include <cstdio>
     #pragma clang diagnostic ignored "-Weverything"
     #pragma clang diagnostic push
