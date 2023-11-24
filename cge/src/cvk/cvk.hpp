@@ -35,7 +35,6 @@
 
 #include <cge.hpp>
 #include "../engine.hpp"
-#include "../soa.hpp"
 
 // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetInstanceProcAddr.html
 #define CVK_LOAD_INSTANCE(instance, var, func) var.func = reinterpret_cast<PFN_##func>(vkGetInstanceProcAddr(instance, #func))
@@ -96,6 +95,10 @@ namespace cvk
 #else
     static inline constexpr std::array<const char*, 0> req_layers{};
 #endif
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceFeatures.html
+    static inline constexpr VkPhysicalDeviceFeatures req_features{};
+
 }
 
 namespace cvk
@@ -107,7 +110,7 @@ namespace cvk
     static inline constexpr cge::Texture default_texture{ .width = 1, .height = 1, .data = &default_color };
 
     static inline constexpr decltype(auto) shader_entry{ "main" };
-    static inline constexpr std::size_t num_pipelines{ 6 };
+    static inline constexpr std::size_t num_pipelines{ 1 };
 
     static inline constexpr Offset null_idx{ ~Offset{} };
 }
@@ -230,7 +233,7 @@ namespace cvk
 
     extern void upload_texture(cvk::Context& ctx, cvk::Renderable& gfx, Offset atlas_idx, cge::Texture tex) noexcept;
 
-    extern VkResult render_frame(cvk::Context& ctx, cvk::Renderable& gfx, const cge::Primitives& prims) noexcept;
+    extern VkResult render_frame(cvk::Context& ctx, cvk::Renderable& gfx, const cge::Scene& scene) noexcept;
     extern void update_surface_info(cvk::Context& ctx, cvk::Renderable& gfx, Offset device_idx) noexcept;
     extern void remake_swapchain(cvk::Context& ctx, cvk::Renderable& gfx, bool vsync) noexcept;
 }

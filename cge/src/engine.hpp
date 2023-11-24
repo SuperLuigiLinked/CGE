@@ -66,16 +66,10 @@ namespace cge
     {
     public:
 
-        using Primitives = RenderSettings::Primitives;
-
-        inline constexpr Primitives& primitives() noexcept { return gfx_settings.self; }
-
-    public:
-
         Game& game;
         
-        GameSettings game_settings;
-        RenderSettings gfx_settings;
+        Settings settings;
+        Scene scene;
         
         wyt_time_t epoch;
         wyn_window_t window;
@@ -89,6 +83,4 @@ namespace cge
         std::atomic<Signal> signal;
     
     };
-
-    using Primitives = cge::Engine::Primitives;
 }

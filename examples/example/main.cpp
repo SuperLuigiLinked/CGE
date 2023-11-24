@@ -27,7 +27,7 @@ int main()
 {
     App app{};
 
-    const cge::GameSettings settings
+    const cge::Settings settings
     {
         .name = "CGE - Example",
         .width = 1280.0,
@@ -47,7 +47,7 @@ int main()
 void App::update([[maybe_unused]] cge::Engine& engine)
 {
     [[maybe_unused]] const double secs{ cge::elapsed_seconds(engine) };
-    [[maybe_unused]] cge::GameSettings& settings{ cge::settings(engine) };
+    [[maybe_unused]] cge::Settings& settings{ cge::settings(engine) };
 
     LOG(fmt::fg(fmt::color::orange), "[UPDATE] [{:.3f}] <{:.2f}> {}\n", secs, secs * settings.fps, this->updates);
     ++this->updates;
@@ -58,53 +58,65 @@ void App::update([[maybe_unused]] cge::Engine& engine)
 void App::render([[maybe_unused]] cge::Engine& engine)
 {
     [[maybe_unused]] const double secs{ cge::elapsed_seconds(engine) };
-    [[maybe_unused]] cge::GameSettings& settings{ cge::settings(engine) };
-    [[maybe_unused]] cge::RenderSettings& render{ cge::renderer(engine) };
+    [[maybe_unused]] cge::Settings& settings{ cge::settings(engine) };
+    [[maybe_unused]] cge::Scene& scene{ cge::scene(engine) };
 
     LOG(fmt::fg(fmt::color::purple), "[RENDER] [{:.3f}] <{:.2f}> {}\n", secs, secs * settings.fps, this->renders);
     ++this->renders;
-
-    render.clear(
-        cge::rgba(
-            255 - std::abs(255 - int((this->updates / 2) % 510)),
-            255 - std::abs(255 - int((this->updates    ) % 510)),
-            255 - std::abs(255 - int((this->updates * 2) % 510)),
-            255
-        )
-    );
-    //render.clear(0xFF000040);
-
-    constexpr float pi{ std::numbers::pi_v<float> };
-    constexpr float tau{ pi + pi };
     
-    constexpr float rad{ 0.75f };
-    const float rot{ float(secs) };
+    scene.clear();
+    scene.backcolor = cge::rgba(
+        255 - std::abs(255 - int((this->updates / 2) % 510)),
+        255 - std::abs(255 - int((this->updates    ) % 510)),
+        255 - std::abs(255 - int((this->updates * 2) % 510)),
+        255
+    );
+    //scene.backcolor = 0xFF000040;
 
-    render.triangle(
-        cge::Vertex {
-            .xyzw = { std::cos((rot + 0.0f / 3.0f) * tau) * rad, std::sin((rot + 0.0f / 3.0f) * tau) * rad },
-            .st = { 0xFFFF0000 },
-        },
-        cge::Vertex {
-            .xyzw = { std::cos((rot + 1.0f / 3.0f) * tau) * rad, std::sin((rot + 1.0f / 3.0f) * tau) * rad },
-            .st = { 0xFF00FF00 },
-        },
-        cge::Vertex {
-            .xyzw = { std::cos((rot + 2.0f / 3.0f) * tau) * rad, std::sin((rot + 2.0f / 3.0f) * tau) * rad },
-            .st = { 0xFF0000FF },
+    [[maybe_unused]] constexpr float pi{ std::numbers::pi_v<float> };
+    [[maybe_unused]] constexpr float tau{ pi + pi };
+    
+    [[maybe_unused]] constexpr float rad{ 0.50f };
+    [[maybe_unused]] const float rot{ float(secs) };
+
+    scene.draw_tri(
+        std::array
+        {
+            cge::Vertex {
+                .xyzw = { std::cos((rot + 0.0f / 3.0f) * tau) * rad, std::sin((rot + 0.0f / 3.0f) * tau) * rad },
+                .st = { 0xFFFF0000 },
+            },
+            cge::Vertex {
+                .xyzw = { std::cos((rot + 1.0f / 3.0f) * tau) * rad, std::sin((rot + 1.0f / 3.0f) * tau) * rad },
+                .st = { 0xFF00FF00 },
+            },
+            cge::Vertex {
+                .xyzw = { std::cos((rot + 2.0f / 3.0f) * tau) * rad, std::sin((rot + 2.0f / 3.0f) * tau) * rad },
+                .st = { 0xFF0000FF },
+            },
         }
     );
 
-    render.triangle(
-        cge::Vertex { .xyzw = { -1.0f, -1.0f }, .st = { 0xFFFF0000 }, },
-        cge::Vertex { .xyzw = {  0.5f,  0.0f }, .st = { 0x00FF0000 }, },
-        cge::Vertex { .xyzw = { -1.0f,  1.0f }, .st = { 0xFFFF0000 }, }
+    scene.draw_strip(
+        std::array
+        {
+            cge::Vertex { .xyzw = { -1.00f, -0.75f }, .st = { 0xFFFF0000 }, },
+            cge::Vertex { .xyzw = { -0.50f, -0.75f }, .st = { 0xFF00FF00 }, },
+            cge::Vertex { .xyzw = { -1.00f,  0.75f }, .st = { 0xFF0000FF }, },
+            cge::Vertex { .xyzw = { -0.50f,  0.75f }, .st = { 0xFFFFFF00 }, },
+        }
     );
 
-    render.triangle(
-        cge::Vertex { .xyzw = {  1.0f, -1.0f }, .st = { 0xFF00FF00 }, },
-        cge::Vertex { .xyzw = { -0.5f,  0.0f }, .st = { 0x0000FF00 }, },
-        cge::Vertex { .xyzw = {  1.0f,  1.0f }, .st = { 0xFF00FF00 }, }
+    scene.draw_fan(
+        std::array
+        {
+            cge::Vertex { .xyzw = {  0.75f,  0.00f }, .st = { 0xFF7F7F7F }, },
+            cge::Vertex { .xyzw = {  1.00f,  0.00f }, .st = { 0xFFFF0000 }, },
+            cge::Vertex { .xyzw = {  0.75f,  0.75f }, .st = { 0xFF00FF00 }, },
+            cge::Vertex { .xyzw = {  0.50f,  0.00f }, .st = { 0xFF0000FF }, },
+            cge::Vertex { .xyzw = {  0.75f, -0.75f }, .st = { 0xFFFFFF00 }, },
+            cge::Vertex { .xyzw = {  1.00f,  0.00f }, .st = { 0xFFFF0000 }, },
+        }
     );
 }
 

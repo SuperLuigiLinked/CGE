@@ -45,7 +45,7 @@ namespace cge
         uvec2 st;
     };
 
-    using Index = std::uint16_t;
+    using Index = std::uint32_t;
 
     using Color = std::uint32_t;
 }
@@ -100,7 +100,7 @@ namespace cge
 
 namespace cge
 {
-    struct GameSettings
+    struct Settings
     {
         const char* name;
         double width;
@@ -110,115 +110,70 @@ namespace cge
         bool fullscreen;
     };
 
-    struct RenderSettings
+    struct Scene
     {
-    private:
-    
-        friend class Engine;
+    public:
 
-        static inline constexpr Index sentinel_idx{ 0xFFFF };
-        static inline constexpr Color default_clr{ 0xFF000000 };
+        std::uint32_t res_w;
+        std::uint32_t res_h;
+        cge::Color backcolor;
 
-        struct Primitives
-        {
-            Color background_clr;
-            std::vector<Vertex> point_vtx;
-            std::vector<Vertex> line_vtx;
-            std::vector<Vertex> triangle_vtx;
-            std::vector<Vertex> line_strip_vtx;
-            std::vector<Index> line_strip_idx;
-            std::vector<Vertex> triangle_strip_vtx;
-            std::vector<Index> triangle_strip_idx;
-            std::vector<Vertex> triangle_fan_vtx;
-            std::vector<Index> triangle_fan_idx;
-        };
-
-        Primitives self;
+        std::vector<cge::Vertex> vertices;
+        std::vector<cge::Index> indices;
 
     public:
 
-        inline constexpr void clear(const Color color = default_clr) noexcept
+        inline constexpr void clear() noexcept
         {
-            self.background_clr = color;
-            self.point_vtx.clear();
-            self.line_vtx.clear();
-            self.triangle_vtx.clear();
-            self.line_strip_vtx.clear();
-            self.line_strip_idx.clear();
-            self.triangle_strip_vtx.clear();
-            self.triangle_strip_idx.clear();
-            self.triangle_fan_vtx.clear();
-            self.triangle_fan_idx.clear();
+            vertices.clear();
+            indices.clear();
         }
 
-        inline constexpr void point(const Vertex& vtx)
+        inline constexpr void draw_tri(const std::span<const cge::Vertex, 3> vtx_list)
         {
-            self.point_vtx.push_back(vtx);
+            const cge::Index base{ static_cast<cge::Index>(vertices.size()) };
+            
+            vertices.push_back(vtx_list[0]);
+            vertices.push_back(vtx_list[1]);
+            vertices.push_back(vtx_list[2]);
+
+            indices.push_back(base);
+            indices.push_back(base + 1);
+            indices.push_back(base + 2);
         }
 
-        inline constexpr void line(const Vertex& vtx_0, const Vertex& vtx_1)
-        {
-            self.line_vtx.push_back(vtx_0);
-            self.line_vtx.push_back(vtx_1);
-        }
-
-        inline constexpr void triangle(const Vertex& vtx_0, const Vertex& vtx_1, const Vertex& vtx_2)
-        {
-            self.triangle_vtx.push_back(vtx_0);
-            self.triangle_vtx.push_back(vtx_1);
-            self.triangle_vtx.push_back(vtx_2);
-        }
-
-        inline constexpr void line_strip(const std::span<const Vertex /* 2+ */> vtx_list)
-        {
-            if (vtx_list.size() < 2) return;
-
-            Index idx{ static_cast<Index>(self.line_strip_vtx.size()) };
-            for (const Vertex& vtx : vtx_list)
-            {
-                self.line_strip_vtx.push_back(vtx);
-                self.line_strip_idx.push_back(idx);
-                ++idx;
-            }
-            self.line_strip_idx.push_back(sentinel_idx);
-        }
-
-        inline constexpr void triangle_strip(const std::span<const Vertex /* 3+ */> vtx_list)
+        inline constexpr void draw_strip(const std::span<const cge::Vertex /* 3+ */> vtx_list)
         {
             if (vtx_list.size() < 3) return;
 
-            Index idx{ static_cast<Index>(self.triangle_strip_vtx.size()) };
-            for (const Vertex& vtx : vtx_list)
+            const cge::Index base{ static_cast<cge::Index>(vertices.size()) };
+            
+            vertices.push_back(vtx_list[0]);
+            vertices.push_back(vtx_list[1]);
+            for (cge::Index rel{ 2 }; rel < vtx_list.size(); ++rel)
             {
-                self.triangle_strip_vtx.push_back(vtx);
-                self.triangle_strip_idx.push_back(idx);
-                ++idx;
+                vertices.push_back(vtx_list[rel]);
+                indices.push_back(base + rel - 2);
+                indices.push_back(base + rel - 1);
+                indices.push_back(base + rel);
             }
-            self.triangle_strip_idx.push_back(sentinel_idx);
         }
 
-        inline constexpr void triangle_fan(const std::span<const Vertex /* 3+ */> vtx_list)
+        inline constexpr void draw_fan(const std::span<const cge::Vertex /* 3+ */> vtx_list)
         {
             if (vtx_list.size() < 3) return;
 
-        #ifdef __APPLE__
-            const Index size{ static_cast<Index>(self.triangle_fan_vtx.size()) };
-            for (Index idx{ 1 }; idx < size - 1; ++idx)
+            const cge::Index base{ static_cast<cge::Index>(vertices.size()) };
+
+            vertices.push_back(vtx_list[0]);
+            vertices.push_back(vtx_list[1]);
+            for (cge::Index rel{ 2 }; rel < vtx_list.size(); ++rel)
             {
-                self.triangle_fan_vtx.push_back(vtx_list[idx]);
-                self.triangle_fan_vtx.push_back(vtx_list[idx + 1]);
-                self.triangle_fan_vtx.push_back(vtx_list[0]);
+                vertices.push_back(vtx_list[rel]);
+                indices.push_back(base + rel - 1);
+                indices.push_back(base + rel);
+                indices.push_back(base);
             }
-        #else
-            Index idx{ static_cast<Index>(self.triangle_fan_vtx.size()) };
-            for (const Vertex& vtx : vtx_list)
-            {
-                self.triangle_fan_vtx.push_back(vtx);
-                self.triangle_fan_idx.push_back(idx);
-                ++idx;
-            }
-            self.triangle_fan_idx.push_back(sentinel_idx);
-        #endif
         }
     };
 }
@@ -230,8 +185,8 @@ namespace cge
     extern void quit(Engine& engine) noexcept;
     extern bool quitting(const Engine& engine) noexcept;
 
-    extern GameSettings& settings(Engine& engine) noexcept;
-    extern RenderSettings& renderer(Engine& engine) noexcept;
+    extern Settings& settings(Engine& engine) noexcept;
+    extern Scene& scene(Engine& engine) noexcept;
 
     extern double elapsed_seconds(const Engine& engine) noexcept;
 }
@@ -254,7 +209,7 @@ namespace cge
      * @warning MUST be called on the Main Thread.
      *          MUST NOT be called while the Engine is already running.
      */
-    void run(Game& game, const GameSettings& settings);
+    void run(Game& game, const Settings& settings);
 }
 
 #endif

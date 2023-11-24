@@ -10,6 +10,7 @@
 #include <string>
 
 #include "cvk.hpp"
+#include "../soa.hpp"
 
 namespace cvk
 {
@@ -85,9 +86,9 @@ namespace cvk
     static VkPresentModeKHR ideal_present(std::span<const VkPresentModeKHR> modes, bool vsync) noexcept;
     static VkExtent2D ideal_resolution(VkExtent2D size, const VkSurfaceCapabilitiesKHR& caps) noexcept;
 
-    extern VkResult render_frame(cvk::Context& ctx, cvk::Renderable& gfx, const cge::Primitives& prims) noexcept;
+    extern VkResult render_frame(cvk::Context& ctx, cvk::Renderable& gfx, const cge::Scene& scene) noexcept;
     static VkResult acquire_image(cvk::Renderable& gfx, cvk::Offset& acquired_idx, VkSemaphore signal_sem, std::span<const VkFence> wait_fences, std::span<const VkFence> reset_fences) noexcept;
-    static VkResult record_commands(cvk::Renderable& gfx, cvk::Offset frame_idx, const cge::Primitives& prims) noexcept;
+    static VkResult record_commands(cvk::Renderable& gfx, cvk::Offset frame_idx, const cge::Scene& scene) noexcept;
     static VkResult submit_commands(cvk::Renderable& gfx, cvk::Offset frame_idx, std::span<const VkSemaphore> wait_sems, std::span<const VkSemaphore> signal_sems, VkFence signal_fence) noexcept;
     static VkResult present_image(cvk::Renderable& gfx, cvk::Offset frame_idx, std::span<const VkSemaphore> wait_sems) noexcept;
 
@@ -535,8 +536,8 @@ namespace cvk
 
     void reinit_device(cvk::Context& ctx, cvk::Renderable& gfx) noexcept
     {
-        static constexpr std::array graphics_prios{ 1.0f };
-        static constexpr std::array present_prios{ 1.0f };
+        constexpr std::array graphics_prios{ 1.0f };
+        constexpr std::array present_prios{ 1.0f };
 
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDeviceQueueCreateInfo.html
         const std::array queues_info{
@@ -557,14 +558,9 @@ namespace cvk
                 .pQueuePriorities = present_prios.data(),
             },
         };
-        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceFeatures.html
-        static constexpr VkPhysicalDeviceFeatures features{};
 
         const bool queues_unique{ gfx.sel_graphics != gfx.sel_present };
         const cvk::Offset queue_unique_count{ static_cast<cvk::Offset>(queues_unique ? 2 : 1) };
-        //const cvk::Offset queue_concurrent_count{ static_cast<cvk::Offset>(queues_unique ? 2 : 0) };
-        //const std::array queue_indices{ gfx.sel_graphics, gfx.sel_present };
-        //const VkSharingMode queue_sharing{ queues_unique ? VK_SHARING_MODE_CONCURRENT : VK_SHARING_MODE_EXCLUSIVE };
 
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDeviceCreateInfo.html
         const VkDeviceCreateInfo device_info{
@@ -577,9 +573,8 @@ namespace cvk
             .ppEnabledLayerNames = cvk::req_layers.data(),
             .enabledExtensionCount = static_cast<cvk::Offset>(cvk::req_device_extensions.size()),
             .ppEnabledExtensionNames = cvk::req_device_extensions.data(),
-            .pEnabledFeatures = &features,
+            .pEnabledFeatures = &cvk::req_features,
         };
-
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCreateDevice.html
         const VkResult res_device{ vkCreateDevice(ctx.devices[gfx.sel_device], &device_info, ctx.allocator, &gfx.device) };
         CGE_ASSERT(res_device == VK_SUCCESS);
@@ -603,9 +598,9 @@ namespace cvk
     {
         {
             constexpr VkDeviceSize MiB{ VkDeviceSize(1) << 20 };
-            gfx.buffer_vtx_size = 32 * MiB;
-            gfx.buffer_idx_size =  2 * MiB;
-            gfx.buffer_stg_size = 16 * MiB;
+            gfx.buffer_vtx_size = 1 * MiB;
+            gfx.buffer_idx_size = 1 * MiB;
+            gfx.buffer_stg_size = 1 * MiB;
             gfx.buffer_vtx_offs = 0;
             gfx.buffer_idx_offs = gfx.buffer_vtx_offs + gfx.buffer_vtx_size;
             gfx.buffer_stg_offs = gfx.buffer_idx_offs + gfx.buffer_idx_size;
@@ -939,19 +934,19 @@ namespace cvk
                 .location = 0,
                 .binding = binding_vertex.binding,
                 .format = VK_FORMAT_R32G32B32A32_SFLOAT,
-                .offset = {},
+                .offset = offsetof(cge::Vertex, xyzw),
             };
             constexpr VkVertexInputAttributeDescription attribute_uv{
                 .location = 1,
                 .binding = binding_vertex.binding,
                 .format = VK_FORMAT_R32G32_SFLOAT,
-                .offset = static_cast<cvk::Offset>(attribute_xyzw.offset + sizeof(cge::vec4)),
+                .offset = offsetof(cge::Vertex, uv),
             };
             constexpr VkVertexInputAttributeDescription attribute_st{
                 .location = 2,
                 .binding = binding_vertex.binding,
                 .format = VK_FORMAT_R32G32_UINT,
-                .offset = static_cast<cvk::Offset>(attribute_uv.offset + sizeof(cge::vec2)),
+                .offset = offsetof(cge::Vertex, st),
             };
             constexpr std::array attributes{ attribute_xyzw, attribute_uv, attribute_st };
 
@@ -1073,20 +1068,6 @@ namespace cvk
             };
 
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPipelineInputAssemblyStateCreateInfo.html
-            constexpr VkPipelineInputAssemblyStateCreateInfo assembly_point_list{
-                .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
-                .pNext = {},
-                .flags = {},
-                .topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST,
-                .primitiveRestartEnable = VK_FALSE,
-            };
-            constexpr VkPipelineInputAssemblyStateCreateInfo assembly_line_list{
-                .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
-                .pNext = {},
-                .flags = {},
-                .topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST,
-                .primitiveRestartEnable = VK_FALSE,
-            };
             constexpr VkPipelineInputAssemblyStateCreateInfo assembly_triangle_list{
                 .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
                 .pNext = {},
@@ -1094,53 +1075,12 @@ namespace cvk
                 .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
                 .primitiveRestartEnable = VK_FALSE,
             };
-            constexpr VkPipelineInputAssemblyStateCreateInfo assembly_line_strip{
-                .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
-                .pNext = {},
-                .flags = {},
-                .topology = VK_PRIMITIVE_TOPOLOGY_LINE_STRIP,
-                .primitiveRestartEnable = VK_TRUE,
-            };
-            constexpr VkPipelineInputAssemblyStateCreateInfo assembly_triangle_strip{
-                .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
-                .pNext = {},
-                .flags = {},
-                .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP,
-                .primitiveRestartEnable = VK_TRUE,
-            };
-            constexpr VkPipelineInputAssemblyStateCreateInfo assembly_triangle_fan{
-                .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
-                .pNext = {},
-                .flags = {},
-            #ifdef __APPLE__
-                .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
-                .primitiveRestartEnable = VK_FALSE,
-            #else
-                .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN,
-                .primitiveRestartEnable = VK_TRUE,
-            #endif
-            };
 
-            VkGraphicsPipelineCreateInfo pipeline_point_list{ default_pipeline };
-            pipeline_point_list.pInputAssemblyState = &assembly_point_list;
-            VkGraphicsPipelineCreateInfo pipeline_line_list{ default_pipeline };
-            pipeline_line_list.pInputAssemblyState = &assembly_line_list;
             VkGraphicsPipelineCreateInfo pipeline_triangle_list{ default_pipeline };
             pipeline_triangle_list.pInputAssemblyState = &assembly_triangle_list;
-            VkGraphicsPipelineCreateInfo pipeline_line_strip{ default_pipeline };
-            pipeline_line_strip.pInputAssemblyState = &assembly_line_strip;
-            VkGraphicsPipelineCreateInfo pipeline_triangle_strip{ default_pipeline };
-            pipeline_triangle_strip.pInputAssemblyState = &assembly_triangle_strip;
-            VkGraphicsPipelineCreateInfo pipeline_triangle_fan{ default_pipeline };
-            pipeline_triangle_fan.pInputAssemblyState = &assembly_triangle_fan;
             
             const std::array<VkGraphicsPipelineCreateInfo, num_pipelines> pipeline_infos{
-                pipeline_triangle_fan,
-                pipeline_triangle_strip,
                 pipeline_triangle_list,
-                pipeline_line_strip,
-                pipeline_line_list,
-                pipeline_point_list,
             };
 
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCreateGraphicsPipelines.html
@@ -1998,8 +1938,9 @@ namespace cvk
         CGE_ASSERT(offs <= buffer_size);
         CGE_ASSERT(size <= buffer_size);
         CGE_ASSERT(next <= buffer_size);
-        
-        std::memcpy(buffer, bytes.data(), bytes.size());
+
+        void* const dst{ static_cast<void*>(static_cast<std::byte*>(buffer) + offs) };
+        std::memcpy(dst, bytes.data(), bytes.size());
 
         const VkDeviceSize prev{ offs };
         offs = next;
@@ -2062,7 +2003,7 @@ namespace cvk
 
 namespace cvk
 {
-    VkResult render_frame(cvk::Context& ctx [[maybe_unused]], cvk::Renderable& gfx, const cge::Primitives& prims) noexcept
+    VkResult render_frame(cvk::Context& ctx [[maybe_unused]], cvk::Renderable& gfx, const cge::Scene& scene) noexcept
     {
         const cvk::Offset this_frame{ gfx.frame_idx };
         const cvk::Offset prev_frame{ (this_frame + (gfx.frame_count - 1)) % gfx.frame_count };
@@ -2076,7 +2017,7 @@ namespace cvk
         const VkResult res_acquire{ cvk::acquire_image(gfx, image_idx, image_acquired, std::array{ this_available, prev_available }, std::array{ this_available }) };
         if (res_acquire < VK_SUCCESS)
         {
-            CGE_LOG("[CGE] Render failed. (Could not acquire image)\n");
+            // CGE_LOG("[CGE] Render failed. (Could not acquire image)\n");
             return res_acquire;
         }
         gfx.frame_idx = (gfx.frame_idx + 1) % gfx.frame_count;
@@ -2087,7 +2028,7 @@ namespace cvk
             CGE_ASSERT(image_idx == this_frame);
         }
 
-        const VkResult res_record{ cvk::record_commands(gfx, image_idx, prims) };
+        const VkResult res_record{ cvk::record_commands(gfx, image_idx, scene) };
         if (res_record != VK_SUCCESS)
         {
             CGE_LOG("[CGE] Render failed. (Could not record commands)\n");
@@ -2104,7 +2045,7 @@ namespace cvk
         const VkResult res_present{ cvk::present_image(gfx, image_idx, std::array{ render_finished }) };
         if (res_present < VK_SUCCESS)
         {
-            CGE_LOG("[CGE] Render failed. (Could not present image)\n");
+            // CGE_LOG("[CGE] Render failed. (Could not present image)\n");
             return res_present;
         }
 
@@ -2132,7 +2073,7 @@ namespace cvk
         return res_acquire;
     }
 
-    VkResult record_commands(cvk::Renderable& gfx, const cvk::Offset frame_idx, const cge::Primitives& prims) noexcept
+    VkResult record_commands(cvk::Renderable& gfx, const cvk::Offset frame_idx, const cge::Scene& scene) noexcept
     {
         // ----------------------------------------------------------------
 
@@ -2165,10 +2106,10 @@ namespace cvk
             .extent = image_res,
         };
 
-        const std::uint32_t clr_b{ (prims.background_clr) & 0xFF };
-        const std::uint32_t clr_g{ (prims.background_clr >> 8) & 0xFF };
-        const std::uint32_t clr_r{ (prims.background_clr >> 16) & 0xFF };
-        const std::uint32_t clr_a{ (prims.background_clr >> 24) & 0xFF };
+        const std::uint32_t clr_b{ (scene.backcolor) & 0xFF };
+        const std::uint32_t clr_g{ (scene.backcolor >> 8) & 0xFF };
+        const std::uint32_t clr_r{ (scene.backcolor >> 16) & 0xFF };
+        const std::uint32_t clr_a{ (scene.backcolor >> 24) & 0xFF };
 
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkClearValue.html
         const VkClearValue clear_value{
@@ -2181,14 +2122,7 @@ namespace cvk
                 }
             }
         };
-        
-        // ======================= RENDERING  ORDER =======================
-        /* Triangle Fans   */
-        /* Triangle Strips */
-        /* Triangles       */
-        /* Line Strips     */
-        /* Lines           */
-        /* Points          */
+
         // ----------------------------------------------------------------
 
         using VertexSpan = std::span<const cge::Vertex>;
@@ -2196,75 +2130,32 @@ namespace cvk
         using ByteSpan = std::span<const std::byte>;
 
         const std::array<VertexSpan, num_pipelines> vertices{
-            /* Triangle Fans   */ VertexSpan{prims.triangle_fan_vtx},
-            /* Triangle Strips */ VertexSpan{prims.triangle_strip_vtx},
-            /* Triangles       */ VertexSpan{prims.triangle_vtx},
-            /* Line Strips     */ VertexSpan{prims.line_strip_vtx},
-            /* Lines           */ VertexSpan{prims.line_vtx},
-            /* Points          */ VertexSpan{prims.point_vtx},
+            /* Triangles */ VertexSpan{scene.vertices},
         };
 
         const std::array<IndexSpan, num_pipelines> indices{
-        #ifdef __APPLE__
-            /* Triangle Fans   */ IndexSpan{},
-        #else
-            /* Triangle Fans   */ IndexSpan{prims.triangle_fan_idx},
-        #endif
-            /* Triangle Strips */ IndexSpan{prims.triangle_strip_idx},
-            /* Triangles       */ IndexSpan{},
-            /* Line Strips     */ IndexSpan{prims.line_strip_idx},
-            /* Lines           */ IndexSpan{},
-            /* Points          */ IndexSpan{},
+            /* Triangles */ IndexSpan{scene.indices},
         };
 
         const std::array<VkDescriptorSet, num_pipelines> descriptor_sets{
-            /* Triangle Fans   */ gfx.descriptor_set,
-            /* Triangle Strips */ gfx.descriptor_set,
-            /* Triangles       */ gfx.descriptor_set,
-            /* Line Strips     */ gfx.descriptor_set,
-            /* Lines           */ gfx.descriptor_set,
-            /* Points          */ gfx.descriptor_set,
+            /* Triangles */ gfx.descriptor_set,
         };
 
         const std::array<VkPipeline, num_pipelines> pipeline_handles{
-            /* Triangle Fans   */ gfx.pipelines_graphics[0],
-            /* Triangle Strips */ gfx.pipelines_graphics[1],
-            /* Triangles       */ gfx.pipelines_graphics[2],
-            /* Line Strips     */ gfx.pipelines_graphics[3],
-            /* Lines           */ gfx.pipelines_graphics[4],
-            /* Points          */ gfx.pipelines_graphics[5],
+            /* Triangles */ gfx.pipelines_graphics[0],
         };
 
         const std::array<VkPipelineLayout, num_pipelines> pipeline_layouts{
-            /* Triangle Fans   */ gfx.pipeline_layout,
-            /* Triangle Strips */ gfx.pipeline_layout,
-            /* Triangles       */ gfx.pipeline_layout,
-            /* Line Strips     */ gfx.pipeline_layout,
-            /* Lines           */ gfx.pipeline_layout,
-            /* Points          */ gfx.pipeline_layout,
+            /* Triangles */ gfx.pipeline_layout,
         };
 
         // ----------------------------------------------------------------
 
         const std::array<ByteSpan, num_pipelines> vtx_bytes{
-            /* Triangle Fans   */ std::as_bytes(std::span{prims.triangle_fan_vtx}),
-            /* Triangle Strips */ std::as_bytes(std::span{prims.triangle_strip_vtx}),
-            /* Triangles       */ std::as_bytes(std::span{prims.triangle_vtx}),
-            /* Line Strips     */ std::as_bytes(std::span{prims.line_strip_vtx}),
-            /* Lines           */ std::as_bytes(std::span{prims.line_vtx}),
-            /* Points          */ std::as_bytes(std::span{prims.point_vtx}),
+            /* Triangles */ std::as_bytes(std::span{scene.vertices}),
         };
         const std::array<ByteSpan, num_pipelines> idx_bytes{
-        #ifdef __APPLE__
-            /* Triangle Fans   */ ByteSpan{},
-        #else
-            /* Triangle Fans   */ std::as_bytes(std::span{prims.triangle_fan_idx}),
-        #endif
-            /* Triangle Strips */ std::as_bytes(std::span{prims.triangle_strip_idx}),
-            /* Triangles       */ ByteSpan{},
-            /* Line Strips     */ std::as_bytes(std::span{prims.line_strip_idx}),
-            /* Lines           */ ByteSpan{},
-            /* Points          */ ByteSpan{},
+            /* Triangles */ std::as_bytes(std::span{scene.indices}),
         };
 
         std::array<VkDeviceSize, num_pipelines> vtx_offs{};
@@ -2357,7 +2248,7 @@ namespace cvk
                     vkCmdBindVertexBuffers(command_buffer, 0, 1, &gfx.buffer_vtx, &vtx_offset);
 
                     if (has_idx)
-                        vkCmdBindIndexBuffer(command_buffer, gfx.buffer_idx, idx_offset, VK_INDEX_TYPE_UINT16);
+                        vkCmdBindIndexBuffer(command_buffer, gfx.buffer_idx, idx_offset, VK_INDEX_TYPE_UINT32);
 
                     if (desc_set)
                         vkCmdBindDescriptorSets(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, layout, 0, 1, &desc_set, 0, nullptr);

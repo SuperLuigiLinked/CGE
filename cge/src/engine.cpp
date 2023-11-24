@@ -14,17 +14,17 @@ namespace cge
 
 namespace cge
 {
-    void run(Game& game, const GameSettings& settings)
+    void run(cge::Game& game, const cge::Settings& settings)
     {
-        Engine engine{
+        cge::Engine engine{
             .game = game,
-            .game_settings = settings,
+            .settings = settings,
         };
         engine.renderer.reset(cge::renderer_vk());
         wyn_run(static_cast<void*>(&engine));
     }
 
-    void quit(Engine& engine) noexcept
+    void quit(cge::Engine& engine) noexcept
     {
         const bool was_quitting{ (engine.signal.fetch_or(cge::signal_quit, std::memory_order::relaxed) & cge::signal_quit) != 0 };
         engine.signal.notify_all();
@@ -42,22 +42,22 @@ namespace cge
         }
     }
 
-    bool quitting(const Engine& engine) noexcept
+    bool quitting(const cge::Engine& engine) noexcept
     {
         return (engine.signal.load(std::memory_order::relaxed) & cge::signal_quit) != 0;
     }
 
-    GameSettings& settings(Engine& engine) noexcept
+    cge::Settings& settings(cge::Engine& engine) noexcept
     {
-        return engine.game_settings;
+        return engine.settings;
     }
 
-    RenderSettings& renderer(Engine& engine) noexcept
+    cge::Scene& scene(cge::Engine& engine) noexcept
     {
-        return engine.gfx_settings;
+        return engine.scene;
     }
     
-    double elapsed_seconds(const Engine& engine) noexcept
+    double elapsed_seconds(const cge::Engine& engine) noexcept
     {
         return double(wyt_nanotime() - engine.epoch) / 1'000'000'000.0;
     }
@@ -65,32 +65,30 @@ namespace cge
 
 extern "C"
 {
-    using namespace cge;
-
     void wyn_on_start(void* const userdata)
     {
-        Engine& engine{ *static_cast<Engine*>(userdata) };
+        cge::Engine& engine{ *static_cast<cge::Engine*>(userdata) };
         
         engine.window = wyn_window_open();
         if (!engine.window) return cge::quit(engine);
 
-        wyn_window_resize(engine.window, { engine.game_settings.width, engine.game_settings.height });
+        wyn_window_resize(engine.window, { engine.settings.width, engine.settings.height });
         engine.renderer->target_window(engine, engine.window);
 
         wyn_window_show(engine.window);
 
         engine.epoch = wyt_nanotime();
 
-        engine.render_thread = wyt_spawn(render_main, userdata);
+        engine.render_thread = wyt_spawn(cge::render_main, userdata);
         if (!engine.render_thread) return cge::quit(engine);
 
-        engine.update_thread = wyt_spawn(update_main, userdata);
+        engine.update_thread = wyt_spawn(cge::update_main, userdata);
         if (!engine.update_thread) return cge::quit(engine);
     }
 
     void wyn_on_stop(void* const userdata)
     {
-        Engine& engine{ *static_cast<Engine*>(userdata) };
+        cge::Engine& engine{ *static_cast<cge::Engine*>(userdata) };
 
         engine.signal.store(cge::signal_quit, std::memory_order::relaxed);
         engine.signal.notify_all();
@@ -113,9 +111,9 @@ extern "C"
 
     void wyn_on_signal(void* const userdata)
     {
-        Engine& engine{ *static_cast<Engine*>(userdata) };
+        cge::Engine& engine{ *static_cast<cge::Engine*>(userdata) };
 
-        const Signal signal{ engine.signal.load(std::memory_order::acquire) };
+        const cge::Signal signal{ engine.signal.load(std::memory_order::acquire) };
         if (!signal) return;
 
         if (signal & cge::signal_quit)
@@ -127,17 +125,17 @@ extern "C"
         if (signal & cge::signal_render)
         {
             engine.game.render(engine);
-            engine.cached_vsync = engine.game_settings.vsync;
+            engine.cached_vsync = engine.settings.vsync;
         }
 
         if (signal & cge::signal_update)
         {
             engine.game.update(engine);
-            engine.cached_fps = engine.game_settings.fps;
+            engine.cached_fps = engine.settings.fps;
         }
 
         {
-           // wyn_window_resize(engine.window, { engine.game_settings.width, engine.game_settings.height });
+           // wyn_window_resize(engine.window, { engine.settings.width, engine.settings.height });
         }
 
         (void)engine.signal.fetch_and(~signal, std::memory_order::release);
@@ -146,7 +144,7 @@ extern "C"
 
     void wyn_on_window_close(void* const userdata, wyn_window_t const window)
     {
-        Engine& engine{ *static_cast<Engine*>(userdata) };
+        cge::Engine& engine{ *static_cast<cge::Engine*>(userdata) };
 
         if (window == engine.window)
         {
