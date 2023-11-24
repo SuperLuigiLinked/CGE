@@ -5,7 +5,7 @@
 
 CGE (aka Siege): A simple C++ Game Engine.
 
-This project is a port of my **Rust Game Engine** to C++.
+This project is a successor to my **Rust Game Engine**.
 
 Supports Windows, Linux, and MacOS, compiled with Clang + CMake.
 
@@ -21,20 +21,26 @@ Supports Windows, Linux, and MacOS, compiled with Clang + CMake.
 ## Example Code
 
 ```
-auto& render = cge::renderer(engine);
+cge::Scene& scene = cge::scene(engine);
 
-render.clear(0xFF000040);
+scene.backcolor = 0xFF000040;
 
-render.triangle(
-  cge::Vertex { .xyzw = { -1.0f, -1.0f }, .st = { 0xFFFF0000 } },
-  cge::Vertex { .xyzw = {  0.5f,  0.0f }, .st = { 0x00FF0000 } },
-  cge::Vertex { .xyzw = { -1.0f,  1.0f }, .st = { 0xFFFF0000 } }
+scene.draw_tri(
+  std::array
+  {
+    cge::Vertex { .xyzw = { -1.0f, -1.0f }, .st = { 0xFFFF0000 } },
+    cge::Vertex { .xyzw = {  0.5f,  0.0f }, .st = { 0x00FF0000 } },
+    cge::Vertex { .xyzw = { -1.0f,  1.0f }, .st = { 0xFFFF0000 } },
+  }
 );
 
-render.triangle(
-  cge::Vertex { .xyzw = {  1.0f, -1.0f }, .st = { 0xFF00FF00 } },
-  cge::Vertex { .xyzw = { -0.5f,  0.0f }, .st = { 0x0000FF00 } },
-  cge::Vertex { .xyzw = {  1.0f,  1.0f }, .st = { 0xFF00FF00 } }
+scene.draw_tri(
+  std::array
+  {
+    cge::Vertex { .xyzw = {  1.0f, -1.0f }, .st = { 0xFF00FF00 } },
+    cge::Vertex { .xyzw = { -0.5f,  0.0f }, .st = { 0x0000FF00 } },
+    cge::Vertex { .xyzw = {  1.0f,  1.0f }, .st = { 0xFF00FF00 } },
+  }
 );
 ```
 
