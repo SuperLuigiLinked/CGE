@@ -1971,6 +1971,7 @@ namespace cvk
             return std::ranges::find_if(formats, [&](const VkSurfaceFormatKHR elem) { return (elem.format == format) && (elem.colorSpace == colorspace); });
         };
         CVK_FIND_RETURN(find_format, formats, VK_FORMAT_B8G8R8A8_SRGB, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR);
+        // CVK_FIND_RETURN(find_format, formats, VK_FORMAT_B8G8R8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR);
         CGE_ASSERT(false);
     }
     
@@ -2106,8 +2107,8 @@ namespace cvk
             .extent = image_res,
         };
 
-        const std::uint32_t clr_b{ (scene.backcolor) & 0xFF };
-        const std::uint32_t clr_g{ (scene.backcolor >> 8) & 0xFF };
+        const std::uint32_t clr_b{ (scene.backcolor      ) & 0xFF };
+        const std::uint32_t clr_g{ (scene.backcolor >>  8) & 0xFF };
         const std::uint32_t clr_r{ (scene.backcolor >> 16) & 0xFF };
         const std::uint32_t clr_a{ (scene.backcolor >> 24) & 0xFF };
 
@@ -2115,9 +2116,9 @@ namespace cvk
         const VkClearValue clear_value{
             .color = {
                 .float32 = {
-                    float(clr_r) / 255.0f,
-                    float(clr_g) / 255.0f,
-                    float(clr_b) / 255.0f,
+                    cge::from_srgb(float(clr_r) / 255.0f),
+                    cge::from_srgb(float(clr_g) / 255.0f),
+                    cge::from_srgb(float(clr_b) / 255.0f),
                     float(clr_a) / 255.0f,
                 }
             }
@@ -2137,6 +2138,13 @@ namespace cvk
             /* Triangles */ IndexSpan{scene.indices},
         };
 
+        const std::array<ByteSpan, num_pipelines> vtx_bytes{
+            /* Triangles */ std::as_bytes(std::span{scene.vertices}),
+        };
+        const std::array<ByteSpan, num_pipelines> idx_bytes{
+            /* Triangles */ std::as_bytes(std::span{scene.indices}),
+        };
+
         const std::array<VkDescriptorSet, num_pipelines> descriptor_sets{
             /* Triangles */ gfx.descriptor_set,
         };
@@ -2151,13 +2159,6 @@ namespace cvk
 
         // ----------------------------------------------------------------
 
-        const std::array<ByteSpan, num_pipelines> vtx_bytes{
-            /* Triangles */ std::as_bytes(std::span{scene.vertices}),
-        };
-        const std::array<ByteSpan, num_pipelines> idx_bytes{
-            /* Triangles */ std::as_bytes(std::span{scene.indices}),
-        };
-
         std::array<VkDeviceSize, num_pipelines> vtx_offs{};
         std::array<VkDeviceSize, num_pipelines> idx_offs{};
 
@@ -2165,9 +2166,8 @@ namespace cvk
         const VkDeviceSize buffer_offs{ gfx.buffer_vtx_offs };
         const VkDeviceSize buffer_size{ gfx.buffer_vtx_size + gfx.buffer_idx_size };
         {
-            void* buffer{};
-
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkMapMemory.html
+            void* buffer;
             const VkResult res_map{ vkMapMemory(gfx.device, buffer_memory, buffer_offs, buffer_size, 0, &buffer) };
             if (res_map != VK_SUCCESS) return res_map;
 
@@ -2228,13 +2228,18 @@ namespace cvk
                 .clearValueCount = 1,
                 .pClearValues = &clear_value,
             };
-            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCmdEndRenderPass.html
+            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCmdBeginRenderPass.html
             vkCmdBeginRenderPass(command_buffer, &pass_info, VK_SUBPASS_CONTENTS_INLINE);
             {
                 for (std::size_t idx{}; idx < num_pipelines; ++idx)
                 {
+                    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCmdBindPipeline.html
                     vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_handles[idx]);
+
+                    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCmdSetViewport.html
                     vkCmdSetViewport(command_buffer, 0, 1, &viewport);
+
+                    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCmdSetScissor.html
                     vkCmdSetScissor(command_buffer, 0, 1, &scissor);
 
                     const VkDeviceSize vtx_offset{ vtx_offs[idx] };
@@ -2245,18 +2250,31 @@ namespace cvk
                     const cvk::Offset idx_count{ static_cast<cvk::Offset>(indices[idx].size()) };
                     const bool has_idx{ indices[idx].data() != nullptr };
 
+                    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCmdBindVertexBuffers.html
                     vkCmdBindVertexBuffers(command_buffer, 0, 1, &gfx.buffer_vtx, &vtx_offset);
 
                     if (has_idx)
+                    {
+                        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCmdBindIndexBuffer.html
                         vkCmdBindIndexBuffer(command_buffer, gfx.buffer_idx, idx_offset, VK_INDEX_TYPE_UINT32);
+                    }
 
                     if (desc_set)
+                    {
+                        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCmdBindDescriptorSets.html
                         vkCmdBindDescriptorSets(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, layout, 0, 1, &desc_set, 0, nullptr);
+                    }
 
                     if (has_idx)
+                    {
+                        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCmdDrawIndexed.html
                         vkCmdDrawIndexed(command_buffer, idx_count, 1, 0, 0, 0);
+                    }
                     else
+                    {
+                        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCmdDraw.html
                         vkCmdDraw(command_buffer, vtx_count, 1, 0, 0);
+                    }
                 }
             }
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCmdEndRenderPass.html

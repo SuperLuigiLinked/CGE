@@ -1,5 +1,7 @@
 #version 450
 
+// ================================================================
+
 // Input Texture Atlas.
 layout(binding = 0) uniform sampler2D atlas;
 
@@ -15,6 +17,8 @@ layout(location = 2) flat in uint in_T;
 // Output RGBA values.
 layout(location = 0) out vec4 out_RGBA;
 
+// ================================================================
+
 // Fragment Shader entry-point.
 void main()
 {
@@ -28,3 +32,5 @@ void main()
         out_RGBA = in_RGBA;
     }
 }
+
+// ================================================================

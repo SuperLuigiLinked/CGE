@@ -9,7 +9,7 @@
 
 namespace soa
 {
-    using Address = decltype(sizeof(int));
+    using Address = std::size_t;
 
     template <typename T>
     static inline constexpr Address suballoc(Address& addr, const Address count) noexcept

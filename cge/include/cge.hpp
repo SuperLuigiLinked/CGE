@@ -10,6 +10,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <cmath>
 #include <span>
 #include <array>
 #include <vector>
@@ -73,6 +74,16 @@ namespace cge
              | (Color(b) << shift_b)
              | (Color(a) << shift_a)
         ;
+    }
+
+    static inline float from_srgb(const float val) noexcept
+    {
+        return val < 0.04045f ? val / 12.92f : std::powf((val + 0.055f) / 1.055f, 2.4f);
+    }
+
+    static inline float to_srgb(const float val) noexcept
+    {
+        return val < 0.04045f / 12.92f ? val * 12.92f : std::powf(val, 1.0f / 2.4f) * 1.055f - 0.055f;
     }
 }
 
