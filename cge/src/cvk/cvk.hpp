@@ -170,20 +170,10 @@ namespace cvk
         VkSurfaceFormatKHR*      ds_formats_array; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSurfaceFormatKHR.html
         VkSurfaceCapabilitiesKHR ds_capabilities ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSurfaceCapabilitiesKHR.html
 
-        VkDeviceMemory       buffer_memory     ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDeviceMemory.html
-        VkDeviceSize         buffer_capacity   ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDeviceSize.html
-        VkBuffer             buffer_vtx        ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkBuffer.html
-        VkBuffer             buffer_idx        ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkBuffer.html
-        VkBuffer             buffer_stg        ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkBuffer.html
-        VkMemoryRequirements buffer_vtx_memreqs; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkMemoryRequirements.html
-        VkMemoryRequirements buffer_idx_memreqs; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkMemoryRequirements.html
-        VkMemoryRequirements buffer_stg_memreqs; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkMemoryRequirements.html
-        VkDeviceSize         buffer_vtx_offs   ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDeviceSize.html
-        VkDeviceSize         buffer_idx_offs   ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDeviceSize.html
-        VkDeviceSize         buffer_stg_offs   ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDeviceSize.html
-        VkDeviceSize         buffer_vtx_size   ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDeviceSize.html
-        VkDeviceSize         buffer_idx_size   ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDeviceSize.html
-        VkDeviceSize         buffer_stg_size   ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDeviceSize.html
+        VkBuffer             buffer_main    ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkBuffer.html
+        VkDeviceMemory       buffer_memory  ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDeviceMemory.html
+        VkDeviceSize         buffer_capacity; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDeviceSize.html
+        VkMemoryRequirements buffer_memreqs ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkMemoryRequirements.html
 
         VkCommandPool         command_pool          ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkCommandPool.html
 

@@ -76,22 +76,23 @@ void App::render([[maybe_unused]] cge::Engine& engine)
     [[maybe_unused]] constexpr float pi{ std::numbers::pi_v<float> };
     [[maybe_unused]] constexpr float tau{ pi + pi };
     
-    [[maybe_unused]] constexpr float rad{ 0.50f };
+    [[maybe_unused]] constexpr float rad{ 0.4375f };
     [[maybe_unused]] const float rot{ float(secs) };
+    [[maybe_unused]] const float aspect{ float(settings.width / settings.height) };
 
     scene.draw_tri(
         std::array
         {
             cge::Vertex {
-                .xyzw = { std::cos((rot + 0.0f / 3.0f) * tau) * rad, std::sin((rot + 0.0f / 3.0f) * tau) * rad },
+                .xyzw = { std::cos((rot + 0.0f / 3.0f) * tau) * rad, std::sin((rot + 0.0f / 3.0f) * tau) * rad * aspect },
                 .st = { 0xFFFF0000 },
             },
             cge::Vertex {
-                .xyzw = { std::cos((rot + 1.0f / 3.0f) * tau) * rad, std::sin((rot + 1.0f / 3.0f) * tau) * rad },
+                .xyzw = { std::cos((rot + 1.0f / 3.0f) * tau) * rad, std::sin((rot + 1.0f / 3.0f) * tau) * rad * aspect },
                 .st = { 0xFF00FF00 },
             },
             cge::Vertex {
-                .xyzw = { std::cos((rot + 2.0f / 3.0f) * tau) * rad, std::sin((rot + 2.0f / 3.0f) * tau) * rad },
+                .xyzw = { std::cos((rot + 2.0f / 3.0f) * tau) * rad, std::sin((rot + 2.0f / 3.0f) * tau) * rad * aspect },
                 .st = { 0xFF0000FF },
             },
         }

@@ -58,7 +58,7 @@ namespace cvk
     static void reinit_pipelines(cvk::Context& ctx, cvk::Renderable& gfx) noexcept;
     static void deinit_pipelines(cvk::Context& ctx, cvk::Renderable& gfx) noexcept;
     extern void remake_swapchain(cvk::Context& ctx, cvk::Renderable& gfx, bool vsync) noexcept;
-    static void deinit_swapchain(cvk::Context& ctx, cvk::Renderable& gfx) noexcept;
+    static void deinit_swapchain(cvk::Context& ctx, cvk::Renderable& gfx, bool deallocate) noexcept;
 
     static void reinit_atlases(cvk::Context& ctx, cvk::Renderable& gfx) noexcept;
     static void deinit_atlases(cvk::Context& ctx, cvk::Renderable& gfx) noexcept;
@@ -412,7 +412,7 @@ namespace cvk
         (void)res_wait;
 
         cvk::deinit_atlases(ctx, gfx);
-        cvk::deinit_swapchain(ctx, gfx);
+        cvk::deinit_swapchain(ctx, gfx, true);
         cvk::deinit_pipelines(ctx, gfx);
         cvk::deinit_shaders(ctx, gfx);
         cvk::deinit_cmdpool(ctx, gfx);
@@ -598,60 +598,29 @@ namespace cvk
     {
         {
             constexpr VkDeviceSize MiB{ VkDeviceSize(1) << 20 };
-            gfx.buffer_vtx_size = 1 * MiB;
-            gfx.buffer_idx_size = 1 * MiB;
-            gfx.buffer_stg_size = 1 * MiB;
-            gfx.buffer_vtx_offs = 0;
-            gfx.buffer_idx_offs = gfx.buffer_vtx_offs + gfx.buffer_vtx_size;
-            gfx.buffer_stg_offs = gfx.buffer_idx_offs + gfx.buffer_idx_size;
+            gfx.buffer_capacity = 1 * MiB;
 
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkBufferCreateInfo.html
-            const VkBufferCreateInfo vtx_info{
+            const VkBufferCreateInfo buffer_info{
                 .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
                 .pNext = {},
                 .flags = {},
-                .size = gfx.buffer_vtx_size,
-                .usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-                .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
-                .queueFamilyIndexCount = {},
-                .pQueueFamilyIndices = {},
-            };
-            const VkBufferCreateInfo idx_info{
-                .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-                .pNext = {},
-                .flags = {},
-                .size = gfx.buffer_idx_size,
-                .usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-                .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
-                .queueFamilyIndexCount = {},
-                .pQueueFamilyIndices = {},
-            };
-            const VkBufferCreateInfo stg_info{
-                .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-                .pNext = {},
-                .flags = {},
-                .size = gfx.buffer_stg_size,
-                .usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                .size = gfx.buffer_capacity,
+                .usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                 .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
                 .queueFamilyIndexCount = {},
                 .pQueueFamilyIndices = {},
             };
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCreateBuffer.html
-            const VkResult res_vtx{ vkCreateBuffer(gfx.device, &vtx_info, ctx.allocator, &gfx.buffer_vtx) };
-            CGE_ASSERT(res_vtx == VK_SUCCESS);
-            const VkResult res_idx{ vkCreateBuffer(gfx.device, &idx_info, ctx.allocator, &gfx.buffer_idx) };
-            CGE_ASSERT(res_idx == VK_SUCCESS);
-            const VkResult res_stg{ vkCreateBuffer(gfx.device, &stg_info, ctx.allocator, &gfx.buffer_stg) };
-            CGE_ASSERT(res_stg == VK_SUCCESS);
+            const VkResult res_buffer{ vkCreateBuffer(gfx.device, &buffer_info, ctx.allocator, &gfx.buffer_main) };
+            CGE_ASSERT(res_buffer == VK_SUCCESS);
 
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetBufferMemoryRequirements.html
-            vkGetBufferMemoryRequirements(gfx.device, gfx.buffer_vtx, &gfx.buffer_vtx_memreqs);
-            vkGetBufferMemoryRequirements(gfx.device, gfx.buffer_idx, &gfx.buffer_idx_memreqs);
-            vkGetBufferMemoryRequirements(gfx.device, gfx.buffer_stg, &gfx.buffer_stg_memreqs);
+            vkGetBufferMemoryRequirements(gfx.device, gfx.buffer_main, &gfx.buffer_memreqs);
         }
         {
-            const VkDeviceSize alloc_size{ gfx.buffer_vtx_memreqs.size + gfx.buffer_idx_memreqs.size + gfx.buffer_stg_memreqs.size };
-            const cvk::Offset alloc_type{ gfx.buffer_vtx_memreqs.memoryTypeBits & gfx.buffer_idx_memreqs.memoryTypeBits & gfx.buffer_stg_memreqs.memoryTypeBits };
+            const VkDeviceSize alloc_size{ gfx.buffer_capacity };
+            const cvk::Offset alloc_type{ gfx.buffer_memreqs.memoryTypeBits };
             constexpr VkMemoryPropertyFlags alloc_props{ VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT };
             
             const VkPhysicalDeviceMemoryProperties& mem_props{ ctx.device_memory[gfx.sel_device] };
@@ -669,31 +638,19 @@ namespace cvk
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkAllocateMemory.html
             const VkResult res_alloc{ vkAllocateMemory(gfx.device, &alloc_info, ctx.allocator, &gfx.buffer_memory) };
             CGE_ASSERT(res_alloc == VK_SUCCESS);
-
-            gfx.buffer_capacity = alloc_size;
         }
         {
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkBindBufferMemory.html
-            const VkResult res_vtx{ vkBindBufferMemory(gfx.device, gfx.buffer_vtx, gfx.buffer_memory, gfx.buffer_vtx_offs) };
-            const VkResult res_idx{ vkBindBufferMemory(gfx.device, gfx.buffer_idx, gfx.buffer_memory, gfx.buffer_idx_offs) };
-            const VkResult res_stg{ vkBindBufferMemory(gfx.device, gfx.buffer_stg, gfx.buffer_memory, gfx.buffer_stg_offs) };
-            CGE_ASSERT(res_vtx == VK_SUCCESS);
-            CGE_ASSERT(res_idx == VK_SUCCESS);
-            CGE_ASSERT(res_stg == VK_SUCCESS);
+            const VkResult res_bind{ vkBindBufferMemory(gfx.device, gfx.buffer_main, gfx.buffer_memory, 0) };
+            CGE_ASSERT(res_bind == VK_SUCCESS);
         }
     }
 
     void deinit_buffers(cvk::Context& ctx [[maybe_unused]], cvk::Renderable& gfx) noexcept
     {
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyBuffer.html
-        if (gfx.buffer_stg)
-            vkDestroyBuffer(gfx.device, gfx.buffer_stg, ctx.allocator);
-        
-        if (gfx.buffer_idx)
-            vkDestroyBuffer(gfx.device, gfx.buffer_idx, ctx.allocator);
-        
-        if (gfx.buffer_vtx)
-            vkDestroyBuffer(gfx.device, gfx.buffer_vtx, ctx.allocator);
+        if (gfx.buffer_main)
+            vkDestroyBuffer(gfx.device, gfx.buffer_main, ctx.allocator);
         
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkFreeMemory.html
         if (gfx.buffer_memory)
@@ -1117,8 +1074,6 @@ namespace cvk
 
     void remake_swapchain(cvk::Context& ctx [[maybe_unused]], cvk::Renderable& gfx, const bool vsync) noexcept
     {
-        const VkSwapchainKHR old_swapchain{ gfx.swapchain };
-
         const std::span<const VkSurfaceFormatKHR> ds_formats{ gfx.ds_formats_array, gfx.ds_formats_count };
         const std::span<const VkPresentModeKHR>   ds_present{ gfx.ds_present_array, gfx.ds_present_count };
 
@@ -1160,35 +1115,23 @@ namespace cvk
                 .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
                 .presentMode = best_present,
                 .clipped = VK_TRUE,
-                .oldSwapchain = old_swapchain,
+                .oldSwapchain = gfx.swapchain,
             };
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCreateSwapchainKHR.html
-            const VkResult res_swapchain{ vkCreateSwapchainKHR(gfx.device, &swapchain_info, ctx.allocator, &gfx.swapchain) };
+            VkSwapchainKHR new_swapchain;
+            const VkResult res_swapchain{ vkCreateSwapchainKHR(gfx.device, &swapchain_info, ctx.allocator, &new_swapchain) };
             CGE_ASSERT(res_swapchain == VK_SUCCESS);
-        }
-        if (old_swapchain != VK_NULL_HANDLE)
-        {
-            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDeviceWaitIdle.html
-            const VkResult res_wait{ vkDeviceWaitIdle(gfx.device) };
-            CGE_ASSERT(res_wait == VK_SUCCESS);
 
-            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkFreeCommandBuffers.html
-            vkFreeCommandBuffers(gfx.device, gfx.command_pool, gfx.frame_count, gfx.frame_commands);
-            for (cvk::Offset idx{}; idx < gfx.frame_count; ++idx)
+            if (gfx.swapchain != VK_NULL_HANDLE)
             {
-                // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyFramebuffer.html
-                vkDestroyFramebuffer(gfx.device, gfx.frame_buffer[idx], ctx.allocator);
-                // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyImageView.html
-                vkDestroyImageView(gfx.device, gfx.frame_view[idx], ctx.allocator);
-                // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroySemaphore.html
-                vkDestroySemaphore(gfx.device, gfx.frame_sem_image[idx], ctx.allocator);
-                vkDestroySemaphore(gfx.device, gfx.frame_sem_render[idx], ctx.allocator);
-                // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyFence.html
-                vkDestroyFence(gfx.device, gfx.frame_fence[idx], ctx.allocator);
-            }
+                // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDeviceWaitIdle.html
+                const VkResult res_wait{ vkDeviceWaitIdle(gfx.device) };
+                CGE_ASSERT(res_wait == VK_SUCCESS);
 
-            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroySwapchainKHR.html
-            vkDestroySwapchainKHR(gfx.device, old_swapchain, ctx.allocator);
+                cvk::deinit_swapchain(ctx, gfx, false);
+
+                gfx.swapchain = new_swapchain;
+            }
         }
         {
             {
@@ -1290,7 +1233,7 @@ namespace cvk
         }
     }
 
-    void deinit_swapchain(cvk::Context& ctx [[maybe_unused]], cvk::Renderable& gfx) noexcept
+    void deinit_swapchain(cvk::Context& ctx [[maybe_unused]], cvk::Renderable& gfx, const bool deallocate) noexcept
     {
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkFreeCommandBuffers.html
         if (gfx.frame_commands)
@@ -1317,7 +1260,9 @@ namespace cvk
             if (gfx.frame_fence[idx])
                 vkDestroyFence(gfx.device, gfx.frame_fence[idx], ctx.allocator);
         }
-        soa::dealloc(gfx.frame_count, gfx.frame_image);
+
+        if (deallocate)
+            soa::dealloc(gfx.frame_count, gfx.frame_image);
         
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroySwapchainKHR.html
         if (gfx.swapchain)
@@ -1579,11 +1524,11 @@ namespace cvk
     {
         {
             const VkDeviceSize tex_size{ static_cast<VkDeviceSize>(tex.size()) };
-            CGE_ASSERT(tex_size <= gfx.buffer_stg_size);
+            CGE_ASSERT(tex_size <= gfx.buffer_capacity);
 
             const VkDeviceMemory buffer_memory{ gfx.buffer_memory };
-            const VkDeviceSize buffer_offs{ gfx.buffer_stg_offs };
-            const VkDeviceSize buffer_size{ gfx.buffer_stg_size };
+            const VkDeviceSize buffer_offs{ 0 };
+            const VkDeviceSize buffer_size{ gfx.buffer_capacity };
             {
                 void* buffer{};
 
@@ -1620,7 +1565,7 @@ namespace cvk
 
             cvk::single_commands(ctx, gfx, [&](const VkCommandBuffer command_buffer){
                 // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCmdCopyBufferToImage.html
-                vkCmdCopyBufferToImage(command_buffer, gfx.buffer_stg, gfx.atlas_image[atlas_idx], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+                vkCmdCopyBufferToImage(command_buffer, gfx.buffer_main, gfx.atlas_image[atlas_idx], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
             });
         }
     }
@@ -2162,8 +2107,8 @@ namespace cvk
         std::array<VkDeviceSize, num_pipelines> idx_offs{};
 
         const VkDeviceMemory buffer_memory{ gfx.buffer_memory };
-        const VkDeviceSize buffer_offs{ gfx.buffer_vtx_offs };
-        const VkDeviceSize buffer_size{ gfx.buffer_vtx_size + gfx.buffer_idx_size };
+        const VkDeviceSize buffer_offs{ 0 };
+        const VkDeviceSize buffer_size{ gfx.buffer_capacity };
         {
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkMapMemory.html
             void* buffer;
@@ -2173,24 +2118,22 @@ namespace cvk
             {
                 VkDeviceSize offset{};
 
-                offset = gfx.buffer_vtx_offs;
                 for (std::size_t idx{}; idx < num_pipelines; ++idx)
                 {
-                    const VkDeviceSize rel_offs{ offset - gfx.buffer_vtx_offs };
+                    const VkDeviceSize rel_offs{ offset - buffer_offs };
                     const VkDeviceSize rel_size{ static_cast<VkDeviceSize>(vtx_bytes[idx].size()) };
                     const VkDeviceSize rel_end{ rel_offs + rel_size };
-                    CGE_ASSERT(rel_end <= gfx.buffer_vtx_size);
+                    CGE_ASSERT(rel_end <= buffer_size);
 
                     vtx_offs[idx] = cvk::map_bytes(buffer_size, buffer, offset, vtx_bytes[idx]);
                 }
 
-                offset = gfx.buffer_idx_offs;
                 for (std::size_t idx{}; idx < num_pipelines; ++idx)
                 {
-                    const VkDeviceSize rel_offs{ offset - gfx.buffer_idx_offs };
+                    const VkDeviceSize rel_offs{ offset - buffer_offs };
                     const VkDeviceSize rel_size{ static_cast<VkDeviceSize>(idx_bytes[idx].size()) };
                     const VkDeviceSize rel_end{ rel_offs + rel_size };
-                    CGE_ASSERT(rel_end <= gfx.buffer_idx_size);
+                    CGE_ASSERT(rel_end <= buffer_size);
 
                     idx_offs[idx] = cvk::map_bytes(buffer_size, buffer, offset, idx_bytes[idx]);
                 }
@@ -2242,7 +2185,7 @@ namespace cvk
                     vkCmdSetScissor(command_buffer, 0, 1, &scissor);
 
                     const VkDeviceSize vtx_offset{ vtx_offs[idx] };
-                    const VkDeviceSize idx_offset{ idx_offs[idx] - gfx.buffer_idx_offs };
+                    const VkDeviceSize idx_offset{ idx_offs[idx] };
                     const VkDescriptorSet desc_set{ descriptor_sets[idx] };
                     const VkPipelineLayout layout{ pipeline_layouts[idx] };
                     const cvk::Offset vtx_count{ static_cast<cvk::Offset>(vertices[idx].size()) };
@@ -2250,12 +2193,12 @@ namespace cvk
                     const bool has_idx{ indices[idx].data() != nullptr };
 
                     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCmdBindVertexBuffers.html
-                    vkCmdBindVertexBuffers(command_buffer, 0, 1, &gfx.buffer_vtx, &vtx_offset);
+                    vkCmdBindVertexBuffers(command_buffer, 0, 1, &gfx.buffer_main, &vtx_offset);
 
                     if (has_idx)
                     {
                         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCmdBindIndexBuffer.html
-                        vkCmdBindIndexBuffer(command_buffer, gfx.buffer_idx, idx_offset, VK_INDEX_TYPE_UINT32);
+                        vkCmdBindIndexBuffer(command_buffer, gfx.buffer_main, idx_offset, VK_INDEX_TYPE_UINT32);
                     }
 
                     if (desc_set)
