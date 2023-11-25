@@ -1126,12 +1126,11 @@ namespace cvk
             {
                 // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDeviceWaitIdle.html
                 const VkResult res_wait{ vkDeviceWaitIdle(gfx.device) };
-                CGE_ASSERT(res_wait == VK_SUCCESS);
+                (void)res_wait;
 
                 cvk::deinit_swapchain(ctx, gfx, false);
-
-                gfx.swapchain = new_swapchain;
             }
+            gfx.swapchain = new_swapchain;
         }
         {
             {
