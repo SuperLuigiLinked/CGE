@@ -15,7 +15,8 @@
 namespace cvk
 {
 #if defined(WYN_COCOA)
-    extern void* create_metal_layer(void* ns_view);
+    extern void* create_metal_layer(void* ns_view) noexcept;
+    extern double backing_scale(void* ns_window) noexcept;
 #endif
 
     static void load_instance_functions(cvk::Context& ctx) noexcept;
@@ -84,7 +85,7 @@ namespace cvk
     static cvk::Offset find_memtype(std::span<const VkMemoryType> mem_types, cvk::Offset alloc_type, cvk::Offset alloc_props) noexcept;
     static VkSurfaceFormatKHR ideal_format(std::span<const VkSurfaceFormatKHR> formats) noexcept;
     static VkPresentModeKHR ideal_present(std::span<const VkPresentModeKHR> modes, bool vsync) noexcept;
-    static VkExtent2D ideal_resolution(VkExtent2D size, const VkSurfaceCapabilitiesKHR& caps) noexcept;
+    static VkExtent2D ideal_resolution(const Renderable& gfx, const VkSurfaceCapabilitiesKHR& caps) noexcept;
 
     extern VkResult render_frame(cvk::Context& ctx, cvk::Renderable& gfx, const cge::Scene& scene) noexcept;
     static VkResult acquire_image(cvk::Renderable& gfx, cvk::Offset& acquired_idx, VkSemaphore signal_sem, std::span<const VkFence> wait_fences, std::span<const VkFence> reset_fences) noexcept;
@@ -963,9 +964,11 @@ namespace cvk
 
             const wyn_size_t wyn_size{ wyn_window_size(gfx.window) };
             gfx.surface_extent = { .width = static_cast<cvk::Offset>(wyn_size.w), .height = static_cast<cvk::Offset>(wyn_size.h) };
+            CGE_LOG("[ CGE] Window: {}x{}\n", gfx.ds_capabilities.currentExtent.width, gfx.ds_capabilities.currentExtent.height);
+            CGE_LOG("[CGE] Surface: {}x{}\n", gfx.surface_extent.width, gfx.surface_extent.height);
 
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkExtent2D.html
-            const VkExtent2D ideal_res{ cvk::ideal_resolution(gfx.surface_extent, gfx.ds_capabilities) };
+            const VkExtent2D ideal_res{ cvk::ideal_resolution(gfx, gfx.ds_capabilities) };
             const VkExtent2D image_res{ .width = (ideal_res.width ? ideal_res.width : 1 ), .height = (ideal_res.height ? ideal_res.height : 1 ) };
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkViewport.html
             const VkViewport viewport{
@@ -1122,7 +1125,7 @@ namespace cvk
         const std::span<const VkSurfaceFormatKHR> ds_formats{ gfx.ds_formats_array, gfx.ds_formats_count };
         const std::span<const VkPresentModeKHR>   ds_present{ gfx.ds_present_array, gfx.ds_present_count };
 
-        const VkExtent2D ideal_res{ cvk::ideal_resolution(gfx.surface_extent, gfx.ds_capabilities) };
+        const VkExtent2D ideal_res{ cvk::ideal_resolution(gfx, gfx.ds_capabilities) };
         if ((ideal_res.width == 0) || (ideal_res.height == 0)) return;
 
         const VkSurfaceFormatKHR best_format{ cvk::ideal_format(ds_formats) };
@@ -1988,17 +1991,20 @@ namespace cvk
         CGE_ASSERT(false);
     }
 
-    VkExtent2D ideal_resolution(const VkExtent2D size, const VkSurfaceCapabilitiesKHR& caps) noexcept
+    VkExtent2D ideal_resolution(const Renderable& gfx, const VkSurfaceCapabilitiesKHR& caps) noexcept
     {
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSurfaceCapabilitiesKHR.html#_description
         constexpr cvk::Offset special_value{ 0xFFFFFFFF };
         
-        if ((caps.currentExtent.width == special_value) && (caps.currentExtent.height == special_value)) return size;
-        return caps.currentExtent;        
-        // return {
-        //     .width = std::clamp(size.width, caps.minImageExtent.width, caps.maxImageExtent.width),
-        //     .height = std::clamp(size.height, caps.minImageExtent.height, caps.maxImageExtent.height),
-        // };
+        if ((caps.currentExtent.width == special_value) && (caps.currentExtent.height == special_value)) return gfx.surface_extent;
+    #if defined(WYN_COCOA)
+        const double scale{ cvk::backing_scale(gfx.window) };
+        const double width{ caps.currentExtent.width * scale };
+        const double height{ caps.currentExtent.height * scale };
+        return VkExtent2D{ .width = static_cast<cvk::Offset>(width), .height = static_cast<cvk::Offset>(height) };
+    #else
+        return caps.currentExtent;
+    #endif
     }
 }
 
@@ -2085,7 +2091,7 @@ namespace cvk
         // ----------------------------------------------------------------
 
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkExtent2D.html
-        const VkExtent2D ideal_res{ cvk::ideal_resolution(gfx.surface_extent, gfx.ds_capabilities) };
+        const VkExtent2D ideal_res{ cvk::ideal_resolution(gfx, gfx.ds_capabilities) };
         const VkExtent2D image_res{ .width = std::max(ideal_res.width, 1u), .height = std::max(ideal_res.height, 1u) };
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkViewport.html
         const VkViewport viewport{
