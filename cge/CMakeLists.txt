@@ -62,15 +62,19 @@ target_compile_options(cge
         "-Wno-braced-scalar-init"
         "-Wno-unsafe-buffer-usage"
         "-Wno-cast-function-type"
-        "-Wno-cast-function-type-strict"
         "-Wno-unused-macros"
 )
+if (APPLE)
+    target_compile_options(cge PRIVATE "-Wno-poison-system-directories")
+else()
+    target_compile_options(cge PRIVATE "-Wno-cast-function-type-strict")
+endif()
 
 # ================================================================================================================================
 
 add_custom_command(
     TARGET cge POST_BUILD
-    COMMAND "${CMAKE_COMMAND}" -E rm -R "${CMAKE_BINARY_DIR}/examples/shaders"
+    COMMAND "${CMAKE_COMMAND}" -E rm -Rf "${CMAKE_BINARY_DIR}/examples/shaders"
     COMMAND "${CMAKE_COMMAND}" -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/src/shaders" "${CMAKE_BINARY_DIR}/examples/shaders"
 )
 

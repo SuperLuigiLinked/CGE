@@ -72,7 +72,8 @@ extern "C"
         engine.window = wyn_window_open();
         if (!engine.window) return cge::quit(engine);
 
-        wyn_window_resize(engine.window, { engine.settings.width, engine.settings.height });
+        const double scale{ wyn_window_scale(engine.window) };
+        wyn_window_resize(engine.window, { engine.settings.width * scale, engine.settings.height * scale });
         engine.renderer->target_window(engine, engine.window);
 
         wyn_window_show(engine.window);

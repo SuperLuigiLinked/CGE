@@ -16,7 +16,6 @@ namespace cvk
 {
 #if defined(WYN_COCOA)
     extern void* create_metal_layer(void* ns_view) noexcept;
-    extern double backing_scale(void* ns_window) noexcept;
 #endif
 
     static void load_instance_functions(cvk::Context& ctx) noexcept;
@@ -964,9 +963,7 @@ namespace cvk
 
             const wyn_size_t wyn_size{ wyn_window_size(gfx.window) };
             gfx.surface_extent = { .width = static_cast<cvk::Offset>(wyn_size.w), .height = static_cast<cvk::Offset>(wyn_size.h) };
-            CGE_LOG("[ CGE] Window: {}x{}\n", gfx.ds_capabilities.currentExtent.width, gfx.ds_capabilities.currentExtent.height);
-            CGE_LOG("[CGE] Surface: {}x{}\n", gfx.surface_extent.width, gfx.surface_extent.height);
-
+            
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkExtent2D.html
             const VkExtent2D ideal_res{ cvk::ideal_resolution(gfx, gfx.ds_capabilities) };
             const VkExtent2D image_res{ .width = (ideal_res.width ? ideal_res.width : 1 ), .height = (ideal_res.height ? ideal_res.height : 1 ) };
@@ -1995,16 +1992,12 @@ namespace cvk
     {
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSurfaceCapabilitiesKHR.html#_description
         constexpr cvk::Offset special_value{ 0xFFFFFFFF };
-        
-        if ((caps.currentExtent.width == special_value) && (caps.currentExtent.height == special_value)) return gfx.surface_extent;
-    #if defined(WYN_COCOA)
-        const double scale{ cvk::backing_scale(gfx.window) };
-        const double width{ caps.currentExtent.width * scale };
-        const double height{ caps.currentExtent.height * scale };
-        return VkExtent2D{ .width = static_cast<cvk::Offset>(width), .height = static_cast<cvk::Offset>(height) };
-    #else
-        return caps.currentExtent;
-    #endif
+        if ((caps.currentExtent.width == special_value) && (caps.currentExtent.height == special_value))
+        {
+            return gfx.surface_extent;
+        }
+        else
+            return caps.currentExtent;
     }
 }
 

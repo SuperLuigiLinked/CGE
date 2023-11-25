@@ -71,7 +71,7 @@ namespace cge
             cvk::update_surface_info(self.ctx, self.gfx, self.gfx.sel_device);
             if (!(self.gfx.ds_capabilities.currentExtent.width && self.gfx.ds_capabilities.currentExtent.height)) return;
             cvk::remake_swapchain(self.ctx, self.gfx, engine.cached_vsync);
-            
+
             if (res_render == VK_ERROR_OUT_OF_DATE_KHR)
             {
                 continue;
