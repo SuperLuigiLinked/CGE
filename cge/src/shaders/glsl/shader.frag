@@ -19,6 +19,18 @@ layout(location = 0) out vec4 out_RGBA;
 
 // ================================================================
 
+float from_srgb(const float val)
+{
+    return val < 0.04045 ? val / 12.92 : pow((val + 0.055) / 1.055, 2.4);
+}
+
+float to_srgb(const float val)
+{
+    return val < 0.04045 / 12.92 ? val * 12.92 : pow(val, 1.0 / 2.4) * 1.055 - 0.055;
+}
+
+// ================================================================
+
 // Fragment Shader entry-point.
 void main()
 {

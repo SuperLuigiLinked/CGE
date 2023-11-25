@@ -70,6 +70,7 @@ target_compile_options(cge
 
 add_custom_command(
     TARGET cge POST_BUILD
+    COMMAND "${CMAKE_COMMAND}" -E rm -R "${CMAKE_BINARY_DIR}/examples/shaders"
     COMMAND "${CMAKE_COMMAND}" -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/src/shaders" "${CMAKE_BINARY_DIR}/examples/shaders"
 )
 

@@ -1403,7 +1403,7 @@ namespace cvk
     {
         CGE_ASSERT(atlas_idx < gfx.atlas_count);
 
-        if (texture.empty()) texture = default_texture;
+        if (texture.empty()) texture = cvk::default_texture;
 
         cvk::destroy_atlas(ctx, gfx, atlas_idx);
         cvk::create_atlas(ctx, gfx, atlas_idx, texture);
@@ -1419,7 +1419,7 @@ namespace cvk
         const VkExtent3D tex_extent{ .width = tex.width, .height = tex.height, .depth = 1 };
 
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkFormat.html
-        const VkFormat tex_format{ VK_FORMAT_R8G8B8A8_UNORM };
+        const VkFormat tex_format{ VK_FORMAT_B8G8R8A8_SRGB };
 
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkComponentMapping.html
         const VkComponentMapping tex_remapping{
