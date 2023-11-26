@@ -46,19 +46,21 @@ namespace cvk
     extern void destroy_renderable(cvk::Context& ctx, cvk::Renderable& gfx) noexcept;
     static void reinit_surface(cvk::Context& ctx, cvk::Renderable& gfx, wyn_window_t window);
     static void deinit_surface(cvk::Context& ctx, cvk::Renderable& gfx) noexcept;
-    extern void update_surface_info(cvk::Context& ctx, cvk::Renderable& gfx, cvk::Offset device_idx, bool vsync) noexcept;
+    static void update_surface_info(cvk::Context& ctx, cvk::Renderable& gfx, cvk::Offset device_idx, bool vsync) noexcept;
     static void reinit_device(cvk::Context& ctx, cvk::Renderable& gfx) noexcept;
     static void deinit_device(cvk::Context& ctx, cvk::Renderable& gfx) noexcept;
     static void reinit_buffers(cvk::Context& ctx, cvk::Renderable& gfx) noexcept;
     static void deinit_buffers(cvk::Context& ctx, cvk::Renderable& gfx) noexcept;
     static void reinit_cmdpool(cvk::Context& ctx, cvk::Renderable& gfx) noexcept;
     static void deinit_cmdpool(cvk::Context& ctx, cvk::Renderable& gfx) noexcept;
-    extern void remake_swapchain(cvk::Context& ctx, cvk::Renderable& gfx, VkExtent2D new_size, bool vsync) noexcept;
+    extern void remake_swapchain(cvk::Context& ctx, cvk::Renderable& gfx, bool vsync) noexcept;
     static void deinit_swapchain(cvk::Context& ctx, cvk::Renderable& gfx, bool deallocate) noexcept;
     static void reinit_shaders(cvk::Context& ctx, cvk::Renderable& gfx) noexcept;
     static void deinit_shaders(cvk::Context& ctx, cvk::Renderable& gfx) noexcept;
     static void reinit_renderpass(cvk::Context& ctx, cvk::Renderable& gfx) noexcept;
     static void deinit_renderpass(cvk::Context& ctx, cvk::Renderable& gfx) noexcept;
+    static void reinit_layout(cvk::Context& ctx, cvk::Renderable& gfx) noexcept;
+    static void deinit_layout(cvk::Context& ctx, cvk::Renderable& gfx) noexcept;
     static void reinit_pipelines(cvk::Context& ctx, cvk::Renderable& gfx) noexcept;
     static void deinit_pipelines(cvk::Context& ctx, cvk::Renderable& gfx) noexcept;
 
@@ -86,7 +88,7 @@ namespace cvk
     static cvk::Offset find_memtype(std::span<const VkMemoryType> mem_types, cvk::Offset alloc_type, cvk::Offset alloc_props) noexcept;
     static VkSurfaceFormatKHR ideal_format(std::span<const VkSurfaceFormatKHR> formats) noexcept;
     static VkPresentModeKHR ideal_present(std::span<const VkPresentModeKHR> modes, bool vsync) noexcept;
-    static VkExtent2D full_resolution(const VkSurfaceCapabilitiesKHR& caps) noexcept;
+    extern VkExtent2D full_resolution(cvk::Context& ctx, cvk::Renderable& gfx, bool update) noexcept;
 
     extern VkResult render_frame(cvk::Context& ctx, cvk::Renderable& gfx, const cge::Scene& scene) noexcept;
     static VkResult acquire_image(cvk::Renderable& gfx, cvk::Offset& acquired_idx, VkSemaphore signal_sem, std::span<const VkFence> wait_fences, std::span<const VkFence> reset_fences) noexcept;
@@ -374,16 +376,16 @@ namespace cvk
 
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/PFN_vkDebugUtilsMessengerCallbackEXT.html
     VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(
-        [[maybe_unused]] VkDebugUtilsMessageSeverityFlagBitsEXT svrt,
-        [[maybe_unused]] VkDebugUtilsMessageTypeFlagsEXT types,
-        [[maybe_unused]] const VkDebugUtilsMessengerCallbackDataEXT* data,
+        VkDebugUtilsMessageSeverityFlagBitsEXT svrt,
+        VkDebugUtilsMessageTypeFlagsEXT types,
+        const VkDebugUtilsMessengerCallbackDataEXT* data,
         [[maybe_unused]] void* user
     ) noexcept
     {
-        [[maybe_unused]] const char* const str_svrt{ cvk::debug_msg_severity(svrt) };
-        [[maybe_unused]] const char* const str_type{ cvk::debug_msg_type(types) };
-        [[maybe_unused]] const char* const str_id{ (data && data->pMessageIdName) ? data->pMessageIdName : "" };
-        [[maybe_unused]] const char* const str_msg{ (data && data->pMessage) ? data->pMessage : "" };
+        const char* const str_svrt{ cvk::debug_msg_severity(svrt) };
+        const char* const str_type{ cvk::debug_msg_type(types) };
+        const char* const str_id{ (data && data->pMessageIdName) ? data->pMessageIdName : "" };
+        const char* const str_msg{ (data && data->pMessage) ? data->pMessage : "" };
         CGE_LOG("[VULKAN DEBUG - {} {}] {}\n{{\n\t{}\n}}\n", str_type, str_svrt, str_id, str_msg);
         return VK_FALSE;
     }
@@ -392,19 +394,21 @@ namespace cvk
 
 namespace cvk
 {
-    void create_renderable(cvk::Context& ctx, cvk::Renderable& gfx, wyn_window_t const window, const VkExtent2D size, const bool vsync) noexcept
+    void create_renderable(cvk::Context& ctx, cvk::Renderable& gfx, wyn_window_t const window, const bool vsync) noexcept
     {
         CGE_LOG("[CGE] Initializing Vulkan Window...\n");
         cvk::reinit_surface(ctx, gfx, window);
         cvk::select_device(ctx, gfx);
         cvk::update_surface_info(ctx, gfx, gfx.sel_device, vsync);
+        CGE_LOG("[CGE] Backbuffers: ({}..{})\n", gfx.ds_capabilities.surfaceCapabilities.minImageCount, gfx.ds_capabilities.surfaceCapabilities.maxImageCount);
         cvk::reinit_device(ctx, gfx);
         cvk::load_device_functions(ctx, gfx);
         cvk::reinit_buffers(ctx, gfx);
         cvk::reinit_cmdpool(ctx, gfx);
         cvk::reinit_renderpass(ctx, gfx);
-        cvk::remake_swapchain(ctx, gfx, size, vsync);
+        cvk::remake_swapchain(ctx, gfx, vsync);
         cvk::reinit_shaders(ctx, gfx);
+        cvk::reinit_layout(ctx, gfx);
         cvk::reinit_pipelines(ctx, gfx);
         cvk::reinit_atlases(ctx, gfx);
     }
@@ -417,6 +421,7 @@ namespace cvk
 
         cvk::deinit_atlases(ctx, gfx);
         cvk::deinit_pipelines(ctx, gfx);
+        cvk::deinit_layout(ctx, gfx);
         cvk::deinit_shaders(ctx, gfx);
         cvk::deinit_swapchain(ctx, gfx, true);
         cvk::deinit_renderpass(ctx, gfx);
@@ -532,34 +537,25 @@ namespace cvk
             CGE_ASSERT(res_props == VK_SUCCESS);
         }
         {
-            gfx.surface_format = cvk::ideal_format({gfx.ds_formats_array, gfx.ds_formats_count});
-            gfx.surface_present = cvk::ideal_present({gfx.ds_present_array, gfx.ds_present_count}, vsync);
-        }
-        {
-            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSurfacePresentScalingCapabilitiesEXT.html
-            gfx.scaling_caps = {
-                .sType = VK_STRUCTURE_TYPE_SURFACE_PRESENT_SCALING_CAPABILITIES_EXT,
-                .pNext = {},
-            };
-            gfx.surface_caps.sType = VK_STRUCTURE_TYPE_SURFACE_CAPABILITIES_2_KHR;
-            gfx.surface_caps.pNext = static_cast<void*>(&gfx.scaling_caps);
+            gfx.ds_capabilities.sType = VK_STRUCTURE_TYPE_SURFACE_CAPABILITIES_2_KHR;
+            gfx.ds_capabilities.pNext = {};
 
-            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSurfacePresentModeEXT.html
-            VkSurfacePresentModeEXT present_info{
-                .sType = VK_STRUCTURE_TYPE_SURFACE_PRESENT_MODE_EXT,
-                .pNext = {},
-                .presentMode = gfx.surface_present,
-            };
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceSurfaceInfo2KHR.html
             const VkPhysicalDeviceSurfaceInfo2KHR surface_info{
                 .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SURFACE_INFO_2_KHR,
-                .pNext = static_cast<void*>(&present_info),
+                .pNext = {},
                 .surface = gfx.surface,
             };
 
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceSurfaceCapabilities2KHR.html
-            const VkResult res_caps{ vkGetPhysicalDeviceSurfaceCapabilities2KHR(device, &surface_info, &gfx.surface_caps) };
+            const VkResult res_caps{ vkGetPhysicalDeviceSurfaceCapabilities2KHR(device, &surface_info, &gfx.ds_capabilities) };
             CGE_ASSERT(res_caps == VK_SUCCESS);
+        }
+        {
+            gfx.surface_format = cvk::ideal_format({gfx.ds_formats_array, gfx.ds_formats_count});
+            gfx.surface_present = cvk::ideal_present({gfx.ds_present_array, gfx.ds_present_count}, vsync);
+            gfx.surface_extent = cvk::full_resolution(ctx, gfx, false);
+            gfx.surface_vsync = vsync;
         }
     }
 
@@ -793,296 +789,86 @@ namespace cvk
             vkDestroyRenderPass(gfx.device, gfx.render_pass, ctx.allocator);        
     }
 
-    void reinit_pipelines(cvk::Context& ctx [[maybe_unused]], cvk::Renderable& gfx) noexcept
+    static void reinit_layout(cvk::Context& ctx, cvk::Renderable& gfx) noexcept
     {
-        // Pipeline Layout
-        {
-            constexpr cvk::Offset max_frames{ 1 };
+        constexpr cvk::Offset max_frames{ 1 };
 
-            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDescriptorSetLayoutBinding.html
-            const VkDescriptorSetLayoutBinding sampler_binding{
-                .binding = 0,
-                .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                .descriptorCount = 1,
-                .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
-                .pImmutableSamplers = {},
-            };
-            const std::array descriptor_bindings{ sampler_binding };
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDescriptorSetLayoutBinding.html
+        const VkDescriptorSetLayoutBinding sampler_binding{
+            .binding = 0,
+            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            .descriptorCount = 1,
+            .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+            .pImmutableSamplers = {},
+        };
+        const std::array descriptor_bindings{ sampler_binding };
 
-            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDescriptorSetLayoutCreateInfo.html
-            const VkDescriptorSetLayoutCreateInfo descriptor_layout_info{
-                .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-                .pNext = {},
-                .flags = {},
-                .bindingCount = static_cast<cvk::Offset>(descriptor_bindings.size()),
-                .pBindings = descriptor_bindings.data(),
-            };
-            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCreateDescriptorSetLayout.html
-            const VkResult res_descset_layout{ vkCreateDescriptorSetLayout(gfx.device, &descriptor_layout_info, ctx.allocator, &gfx.descriptor_layout) };
-            CGE_ASSERT(res_descset_layout == VK_SUCCESS);
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDescriptorSetLayoutCreateInfo.html
+        const VkDescriptorSetLayoutCreateInfo descriptor_layout_info{
+            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+            .pNext = {},
+            .flags = {},
+            .bindingCount = static_cast<cvk::Offset>(descriptor_bindings.size()),
+            .pBindings = descriptor_bindings.data(),
+        };
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCreateDescriptorSetLayout.html
+        const VkResult res_descset_layout{ vkCreateDescriptorSetLayout(gfx.device, &descriptor_layout_info, ctx.allocator, &gfx.descriptor_layout) };
+        CGE_ASSERT(res_descset_layout == VK_SUCCESS);
 
-            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDescriptorPoolSize.html
-            const VkDescriptorPoolSize sampler_pool_size{
-                .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                .descriptorCount = max_frames,
-            };
-            const std::array descriptor_pool_sizes{ sampler_pool_size };
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDescriptorPoolSize.html
+        const VkDescriptorPoolSize sampler_pool_size{
+            .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            .descriptorCount = max_frames,
+        };
+        const std::array descriptor_pool_sizes{ sampler_pool_size };
 
-            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDescriptorPoolCreateInfo.html
-            const VkDescriptorPoolCreateInfo descriptor_pool_info{
-                .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-                .pNext = {},
-                .flags = {},
-                .maxSets = max_frames,
-                .poolSizeCount = static_cast<cvk::Offset>(descriptor_pool_sizes.size()),
-                .pPoolSizes = descriptor_pool_sizes.data(),
-            };
-            const VkResult res_pool{ vkCreateDescriptorPool(gfx.device, &descriptor_pool_info, ctx.allocator, &gfx.descriptor_pool) };
-            CGE_ASSERT(res_pool == VK_SUCCESS);
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDescriptorPoolCreateInfo.html
+        const VkDescriptorPoolCreateInfo descriptor_pool_info{
+            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+            .pNext = {},
+            .flags = {},
+            .maxSets = max_frames,
+            .poolSizeCount = static_cast<cvk::Offset>(descriptor_pool_sizes.size()),
+            .pPoolSizes = descriptor_pool_sizes.data(),
+        };
+        const VkResult res_pool{ vkCreateDescriptorPool(gfx.device, &descriptor_pool_info, ctx.allocator, &gfx.descriptor_pool) };
+        CGE_ASSERT(res_pool == VK_SUCCESS);
 
-            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDescriptorSetLayout.html
-            const std::array set_layouts{ gfx.descriptor_layout };
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDescriptorSetLayout.html
+        const std::array set_layouts{ gfx.descriptor_layout };
 
-            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPushConstantRange.html
-            const std::array<VkPushConstantRange, 0> pc_ranges{};
-            
-            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDescriptorSetAllocateInfo.html
-            const VkDescriptorSetAllocateInfo alloc_info{
-                .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-                .pNext = {},
-                .descriptorPool = gfx.descriptor_pool,
-                .descriptorSetCount = static_cast<cvk::Offset>(set_layouts.size()),
-                .pSetLayouts = set_layouts.data(),
-            };
-            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkAllocateDescriptorSets.html
-            const VkResult res_alloc{ vkAllocateDescriptorSets(gfx.device, &alloc_info, &gfx.descriptor_set) };
-            CGE_ASSERT(res_alloc == VK_SUCCESS);
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPushConstantRange.html
+        const std::array<VkPushConstantRange, 0> pc_ranges{};
+        
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDescriptorSetAllocateInfo.html
+        const VkDescriptorSetAllocateInfo alloc_info{
+            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+            .pNext = {},
+            .descriptorPool = gfx.descriptor_pool,
+            .descriptorSetCount = static_cast<cvk::Offset>(set_layouts.size()),
+            .pSetLayouts = set_layouts.data(),
+        };
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkAllocateDescriptorSets.html
+        const VkResult res_alloc{ vkAllocateDescriptorSets(gfx.device, &alloc_info, &gfx.descriptor_set) };
+        CGE_ASSERT(res_alloc == VK_SUCCESS);
 
-            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPipelineLayoutCreateInfo.html
-            const VkPipelineLayoutCreateInfo pipeline_layout_info{
-                .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-                .pNext = {},
-                .flags = {},
-                .setLayoutCount = static_cast<cvk::Offset>(set_layouts.size()),
-                .pSetLayouts = set_layouts.data(),
-                .pushConstantRangeCount = static_cast<cvk::Offset>(pc_ranges.size()),
-                .pPushConstantRanges = pc_ranges.data(),
-            };
-            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCreatePipelineLayout.html
-            const VkResult res_layout{ vkCreatePipelineLayout(gfx.device, &pipeline_layout_info, ctx.allocator, &gfx.pipeline_layout) };
-            CGE_ASSERT(res_layout == VK_SUCCESS);
-        }
-
-        // Graphics Pipelines
-        {
-            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDynamicState.html
-            const std::array dynamic_states{
-                VK_DYNAMIC_STATE_VIEWPORT,
-                VK_DYNAMIC_STATE_SCISSOR,
-            };
-
-            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPipelineDynamicStateCreateInfo.html
-            const VkPipelineDynamicStateCreateInfo dynamic_info{
-                .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
-                .pNext = {},
-                .flags = {},
-                .dynamicStateCount = static_cast<cvk::Offset>(dynamic_states.size()),
-                .pDynamicStates = dynamic_states.data(),
-            };
-
-            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPipelineShaderStageCreateInfo.html
-            const std::array shader_stages{
-                VkPipelineShaderStageCreateInfo{
-                    .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-                    .pNext = {},
-                    .flags = {},
-                    .stage = VK_SHADER_STAGE_VERTEX_BIT,
-                    .module = gfx.module_vertex,
-                    .pName = shader_entry,
-                    .pSpecializationInfo = {},
-                },
-                VkPipelineShaderStageCreateInfo{
-                    .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-                    .pNext = {},
-                    .flags = {},
-                    .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
-                    .module = gfx.module_fragment,
-                    .pName = shader_entry,
-                    .pSpecializationInfo = {},
-                },
-            };
-
-            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkVertexInputBindingDescription.html
-            constexpr VkVertexInputBindingDescription binding_vertex{
-                .binding = 0,
-                .stride = static_cast<cvk::Offset>(sizeof(cge::Vertex)),
-                .inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
-            };
-            constexpr std::array bindings{ binding_vertex };
-
-            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkVertexInputAttributeDescription.html
-            constexpr VkVertexInputAttributeDescription attribute_xyzw{
-                .location = 0,
-                .binding = binding_vertex.binding,
-                .format = VK_FORMAT_R32G32B32A32_SFLOAT,
-                .offset = offsetof(cge::Vertex, xyzw),
-            };
-            constexpr VkVertexInputAttributeDescription attribute_uv{
-                .location = 1,
-                .binding = binding_vertex.binding,
-                .format = VK_FORMAT_R32G32_SFLOAT,
-                .offset = offsetof(cge::Vertex, uv),
-            };
-            constexpr VkVertexInputAttributeDescription attribute_st{
-                .location = 2,
-                .binding = binding_vertex.binding,
-                .format = VK_FORMAT_R32G32_UINT,
-                .offset = offsetof(cge::Vertex, st),
-            };
-            constexpr std::array attributes{ attribute_xyzw, attribute_uv, attribute_st };
-
-            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPipelineVertexInputStateCreateInfo.html
-            const VkPipelineVertexInputStateCreateInfo vertex_info{
-                .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
-                .pNext = {},
-                .flags = {},
-                .vertexBindingDescriptionCount = static_cast<cvk::Offset>(bindings.size()),
-                .pVertexBindingDescriptions = bindings.data(),
-                .vertexAttributeDescriptionCount = static_cast<cvk::Offset>(attributes.size()),
-                .pVertexAttributeDescriptions = attributes.data(),
-            };
-            
-            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkViewport.html
-            const VkViewport viewport{
-                .x = 0.0f,
-                .y = 0.0f,
-                .width = float(gfx.surface_extent.width),
-                .height = float(gfx.surface_extent.height),
-                .minDepth = 0.0f,
-                .maxDepth = 0.0f,
-            };
-            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkRect2D.html
-            const VkRect2D scissor{
-                .offset = { 0, 0 },
-                .extent = gfx.surface_extent,
-            };
-            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPipelineViewportStateCreateInfo.html
-            const VkPipelineViewportStateCreateInfo viewport_info{
-                .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
-                .pNext = {},
-                .flags = {},
-                .viewportCount = 1,
-                .pViewports = &viewport,
-                .scissorCount = 1,
-                .pScissors = &scissor,
-            };
-
-            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPipelineRasterizationStateCreateInfo.html
-            const VkPipelineRasterizationStateCreateInfo rasterizer_info{
-                .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
-                .pNext = {},
-                .flags = {},
-                .depthClampEnable = VK_FALSE,
-                .rasterizerDiscardEnable = VK_FALSE,
-                .polygonMode = VK_POLYGON_MODE_FILL,
-                .cullMode = VK_CULL_MODE_NONE,
-                .frontFace = VK_FRONT_FACE_CLOCKWISE,
-                .depthBiasEnable = VK_FALSE,
-                .depthBiasConstantFactor = 0.0f,
-                .depthBiasClamp = 0.0f,
-                .depthBiasSlopeFactor = 0.0f,
-                .lineWidth = 1.0f,
-            };
-            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPipelineMultisampleStateCreateInfo.html
-            const VkPipelineMultisampleStateCreateInfo multisample_info{
-                .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
-                .pNext = {},
-                .flags = {},
-                .rasterizationSamples = VK_SAMPLE_COUNT_1_BIT,
-                .sampleShadingEnable = VK_FALSE,
-                .minSampleShading = {},
-                .pSampleMask = {},
-                .alphaToCoverageEnable = VK_FALSE,
-                .alphaToOneEnable = VK_FALSE,
-            };
-
-            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPipelineColorBlendAttachmentState.html
-            const VkPipelineColorBlendAttachmentState blend_attachment{
-                .blendEnable = VK_TRUE,
-                .srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA,
-                .dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
-                .colorBlendOp = VK_BLEND_OP_ADD,
-                .srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE,
-                .dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO,
-                .alphaBlendOp = VK_BLEND_OP_ADD,
-                .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
-            };
-            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPipelineColorBlendStateCreateInfo.html
-            const VkPipelineColorBlendStateCreateInfo blend_info{
-                .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
-                .pNext = {},
-                .flags = {},
-                .logicOpEnable = VK_FALSE,
-                .logicOp = VK_LOGIC_OP_CLEAR,
-                .attachmentCount = 1,
-                .pAttachments = &blend_attachment,
-                .blendConstants = { 0.0f, 0.0f, 0.0f, 0.0f },
-            };
-
-            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkGraphicsPipelineCreateInfo.html
-            const VkGraphicsPipelineCreateInfo default_pipeline{
-                .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
-                .pNext = {},
-                .flags = {},
-                .stageCount = static_cast<cvk::Offset>(shader_stages.size()),
-                .pStages = shader_stages.data(),
-                .pVertexInputState = &vertex_info,
-                .pInputAssemblyState = {},
-                .pTessellationState = {},
-                .pViewportState = &viewport_info,
-                .pRasterizationState = &rasterizer_info,
-                .pMultisampleState = &multisample_info,
-                .pDepthStencilState = {},
-                .pColorBlendState = &blend_info,
-                .pDynamicState = &dynamic_info,
-                .layout = gfx.pipeline_layout,
-                .renderPass = gfx.render_pass,
-                .subpass = {},
-                .basePipelineHandle = {},
-                .basePipelineIndex = {},
-            };
-
-            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPipelineInputAssemblyStateCreateInfo.html
-            constexpr VkPipelineInputAssemblyStateCreateInfo assembly_triangle_list{
-                .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
-                .pNext = {},
-                .flags = {},
-                .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
-                .primitiveRestartEnable = VK_FALSE,
-            };
-
-            VkGraphicsPipelineCreateInfo pipeline_triangle_list{ default_pipeline };
-            pipeline_triangle_list.pInputAssemblyState = &assembly_triangle_list;
-            
-            const std::array<VkGraphicsPipelineCreateInfo, num_pipelines> pipeline_infos{
-                pipeline_triangle_list,
-            };
-
-            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCreateGraphicsPipelines.html
-            const VkResult res_graphics{ vkCreateGraphicsPipelines(gfx.device, nullptr, static_cast<cvk::Offset>(pipeline_infos.size()), pipeline_infos.data(), ctx.allocator, gfx.pipelines_graphics) };
-            CGE_ASSERT(res_graphics == VK_SUCCESS);
-        }
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPipelineLayoutCreateInfo.html
+        const VkPipelineLayoutCreateInfo pipeline_layout_info{
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+            .pNext = {},
+            .flags = {},
+            .setLayoutCount = static_cast<cvk::Offset>(set_layouts.size()),
+            .pSetLayouts = set_layouts.data(),
+            .pushConstantRangeCount = static_cast<cvk::Offset>(pc_ranges.size()),
+            .pPushConstantRanges = pc_ranges.data(),
+        };
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCreatePipelineLayout.html
+        const VkResult res_layout{ vkCreatePipelineLayout(gfx.device, &pipeline_layout_info, ctx.allocator, &gfx.pipeline_layout) };
+        CGE_ASSERT(res_layout == VK_SUCCESS);
     }
 
-    void deinit_pipelines(cvk::Context& ctx [[maybe_unused]], cvk::Renderable& gfx) noexcept
+    static void deinit_layout(cvk::Context& ctx, cvk::Renderable& gfx) noexcept
     {
-        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyPipeline.html
-        for (const VkPipeline pipeline : gfx.pipelines_graphics)
-        {
-            if (pipeline)
-                vkDestroyPipeline(gfx.device, pipeline, ctx.allocator);
-        }
-        
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyDescriptorPool.html
         if (gfx.descriptor_pool)
             vkDestroyDescriptorPool(gfx.device, gfx.descriptor_pool, ctx.allocator);
@@ -1096,24 +882,226 @@ namespace cvk
             vkDestroyPipelineLayout(gfx.device, gfx.pipeline_layout, ctx.allocator);
     }
 
-    void remake_swapchain(cvk::Context& ctx [[maybe_unused]], cvk::Renderable& gfx, const VkExtent2D new_size, const bool vsync) noexcept
+    void reinit_pipelines(cvk::Context& ctx [[maybe_unused]], cvk::Renderable& gfx) noexcept
+    {
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDynamicState.html
+        const std::array dynamic_states{
+            VK_DYNAMIC_STATE_VIEWPORT,
+            VK_DYNAMIC_STATE_SCISSOR,
+        };
+
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPipelineDynamicStateCreateInfo.html
+        const VkPipelineDynamicStateCreateInfo dynamic_info{
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
+            .pNext = {},
+            .flags = {},
+            .dynamicStateCount = static_cast<cvk::Offset>(dynamic_states.size()),
+            .pDynamicStates = dynamic_states.data(),
+        };
+
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPipelineShaderStageCreateInfo.html
+        const std::array shader_stages{
+            VkPipelineShaderStageCreateInfo{
+                .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+                .pNext = {},
+                .flags = {},
+                .stage = VK_SHADER_STAGE_VERTEX_BIT,
+                .module = gfx.module_vertex,
+                .pName = shader_entry,
+                .pSpecializationInfo = {},
+            },
+            VkPipelineShaderStageCreateInfo{
+                .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+                .pNext = {},
+                .flags = {},
+                .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
+                .module = gfx.module_fragment,
+                .pName = shader_entry,
+                .pSpecializationInfo = {},
+            },
+        };
+
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkVertexInputBindingDescription.html
+        constexpr VkVertexInputBindingDescription binding_vertex{
+            .binding = 0,
+            .stride = static_cast<cvk::Offset>(sizeof(cge::Vertex)),
+            .inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
+        };
+        constexpr std::array bindings{ binding_vertex };
+
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkVertexInputAttributeDescription.html
+        constexpr VkVertexInputAttributeDescription attribute_xyzw{
+            .location = 0,
+            .binding = binding_vertex.binding,
+            .format = VK_FORMAT_R32G32B32A32_SFLOAT,
+            .offset = offsetof(cge::Vertex, xyzw),
+        };
+        constexpr VkVertexInputAttributeDescription attribute_uv{
+            .location = 1,
+            .binding = binding_vertex.binding,
+            .format = VK_FORMAT_R32G32_SFLOAT,
+            .offset = offsetof(cge::Vertex, uv),
+        };
+        constexpr VkVertexInputAttributeDescription attribute_st{
+            .location = 2,
+            .binding = binding_vertex.binding,
+            .format = VK_FORMAT_R32G32_UINT,
+            .offset = offsetof(cge::Vertex, st),
+        };
+        constexpr std::array attributes{ attribute_xyzw, attribute_uv, attribute_st };
+
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPipelineVertexInputStateCreateInfo.html
+        const VkPipelineVertexInputStateCreateInfo vertex_info{
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+            .pNext = {},
+            .flags = {},
+            .vertexBindingDescriptionCount = static_cast<cvk::Offset>(bindings.size()),
+            .pVertexBindingDescriptions = bindings.data(),
+            .vertexAttributeDescriptionCount = static_cast<cvk::Offset>(attributes.size()),
+            .pVertexAttributeDescriptions = attributes.data(),
+        };
+        
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkViewport.html
+        const VkViewport viewport{
+            .x = 0.0f,
+            .y = 0.0f,
+            .width = float(gfx.surface_extent.width),
+            .height = float(gfx.surface_extent.height),
+            .minDepth = 0.0f,
+            .maxDepth = 0.0f,
+        };
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkRect2D.html
+        const VkRect2D scissor{
+            .offset = { 0, 0 },
+            .extent = gfx.surface_extent,
+        };
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPipelineViewportStateCreateInfo.html
+        const VkPipelineViewportStateCreateInfo viewport_info{
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
+            .pNext = {},
+            .flags = {},
+            .viewportCount = 1,
+            .pViewports = &viewport,
+            .scissorCount = 1,
+            .pScissors = &scissor,
+        };
+
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPipelineRasterizationStateCreateInfo.html
+        const VkPipelineRasterizationStateCreateInfo rasterizer_info{
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
+            .pNext = {},
+            .flags = {},
+            .depthClampEnable = VK_FALSE,
+            .rasterizerDiscardEnable = VK_FALSE,
+            .polygonMode = VK_POLYGON_MODE_FILL,
+            .cullMode = VK_CULL_MODE_NONE,
+            .frontFace = VK_FRONT_FACE_CLOCKWISE,
+            .depthBiasEnable = VK_FALSE,
+            .depthBiasConstantFactor = 0.0f,
+            .depthBiasClamp = 0.0f,
+            .depthBiasSlopeFactor = 0.0f,
+            .lineWidth = 1.0f,
+        };
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPipelineMultisampleStateCreateInfo.html
+        const VkPipelineMultisampleStateCreateInfo multisample_info{
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
+            .pNext = {},
+            .flags = {},
+            .rasterizationSamples = VK_SAMPLE_COUNT_1_BIT,
+            .sampleShadingEnable = VK_FALSE,
+            .minSampleShading = {},
+            .pSampleMask = {},
+            .alphaToCoverageEnable = VK_FALSE,
+            .alphaToOneEnable = VK_FALSE,
+        };
+
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPipelineColorBlendAttachmentState.html
+        const VkPipelineColorBlendAttachmentState blend_attachment{
+            .blendEnable = VK_TRUE,
+            .srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA,
+            .dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+            .colorBlendOp = VK_BLEND_OP_ADD,
+            .srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE,
+            .dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO,
+            .alphaBlendOp = VK_BLEND_OP_ADD,
+            .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
+        };
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPipelineColorBlendStateCreateInfo.html
+        const VkPipelineColorBlendStateCreateInfo blend_info{
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
+            .pNext = {},
+            .flags = {},
+            .logicOpEnable = VK_FALSE,
+            .logicOp = VK_LOGIC_OP_CLEAR,
+            .attachmentCount = 1,
+            .pAttachments = &blend_attachment,
+            .blendConstants = { 0.0f, 0.0f, 0.0f, 0.0f },
+        };
+
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkGraphicsPipelineCreateInfo.html
+        const VkGraphicsPipelineCreateInfo default_pipeline{
+            .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
+            .pNext = {},
+            .flags = {},
+            .stageCount = static_cast<cvk::Offset>(shader_stages.size()),
+            .pStages = shader_stages.data(),
+            .pVertexInputState = &vertex_info,
+            .pInputAssemblyState = {},
+            .pTessellationState = {},
+            .pViewportState = &viewport_info,
+            .pRasterizationState = &rasterizer_info,
+            .pMultisampleState = &multisample_info,
+            .pDepthStencilState = {},
+            .pColorBlendState = &blend_info,
+            .pDynamicState = &dynamic_info,
+            .layout = gfx.pipeline_layout,
+            .renderPass = gfx.render_pass,
+            .subpass = {},
+            .basePipelineHandle = {},
+            .basePipelineIndex = {},
+        };
+
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPipelineInputAssemblyStateCreateInfo.html
+        constexpr VkPipelineInputAssemblyStateCreateInfo assembly_triangle_list{
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
+            .pNext = {},
+            .flags = {},
+            .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+            .primitiveRestartEnable = VK_FALSE,
+        };
+
+        VkGraphicsPipelineCreateInfo pipeline_triangle_list{ default_pipeline };
+        pipeline_triangle_list.pInputAssemblyState = &assembly_triangle_list;
+        
+        const std::array<VkGraphicsPipelineCreateInfo, num_pipelines> pipeline_infos{
+            pipeline_triangle_list,
+        };
+
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCreateGraphicsPipelines.html
+        const VkResult res_graphics{ vkCreateGraphicsPipelines(gfx.device, nullptr, static_cast<cvk::Offset>(pipeline_infos.size()), pipeline_infos.data(), ctx.allocator, gfx.pipelines_graphics) };
+        CGE_ASSERT(res_graphics == VK_SUCCESS);
+    }
+
+    void deinit_pipelines(cvk::Context& ctx [[maybe_unused]], cvk::Renderable& gfx) noexcept
+    {
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDestroyPipeline.html
+        for (const VkPipeline pipeline : gfx.pipelines_graphics)
+        {
+            if (pipeline)
+                vkDestroyPipeline(gfx.device, pipeline, ctx.allocator);
+        }
+    }
+
+    void remake_swapchain(cvk::Context& ctx, cvk::Renderable& gfx, const bool vsync) noexcept
     {
         cvk::update_surface_info(ctx, gfx, gfx.sel_device, vsync);
-
-        const VkExtent2D& min_extent{ gfx.scaling_caps.minScaledImageExtent };
-        const VkExtent2D& max_extent{ gfx.scaling_caps.maxScaledImageExtent };
-
-        gfx.surface_extent = {
-            .width = std::clamp(new_size.width, min_extent.width, max_extent.width),
-            .height = std::clamp(new_size.height, min_extent.height, max_extent.height),
-        };
-        // gfx.surface_extent = cvk::full_resolution(gfx.surface_caps.surfaceCapabilities);
+        if (!(gfx.surface_extent.width && gfx.surface_extent.height)) return;
 
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSurfaceCapabilitiesKHR.html#_description
-        const cvk::Offset min_images{ gfx.surface_caps.surfaceCapabilities.minImageCount };
-        const cvk::Offset max_images{ gfx.surface_caps.surfaceCapabilities.maxImageCount };
-        const cvk::Offset req_images{ min_images + 1};
-        const cvk::Offset num_images{ (max_images == 0) ? req_images : std::min(req_images, max_images) };
+        const cvk::Offset min_images{ gfx.ds_capabilities.surfaceCapabilities.minImageCount };
+        const cvk::Offset max_images{ gfx.ds_capabilities.surfaceCapabilities.maxImageCount };
+        const cvk::Offset req_images{ 2 };
+        const cvk::Offset num_images{ (max_images == 0) ? req_images : std::clamp(req_images, min_images, max_images) };
 
         const bool queues_unique{ gfx.sel_graphics != gfx.sel_present };
         const cvk::Offset queue_concurrent_count{ static_cast<cvk::Offset>(queues_unique ? 2 : 0) };
@@ -1122,19 +1110,10 @@ namespace cvk
         const VkSharingMode queue_sharing{ queues_unique ? VK_SHARING_MODE_CONCURRENT : VK_SHARING_MODE_EXCLUSIVE };
 
         {
-            // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSwapchainPresentScalingCreateInfoEXT.html
-            const VkSwapchainPresentScalingCreateInfoEXT scaling_info{
-                .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_PRESENT_SCALING_CREATE_INFO_EXT,
-                .pNext = {},
-                .scalingBehavior = VK_PRESENT_SCALING_ONE_TO_ONE_BIT_EXT,
-                .presentGravityX = VK_PRESENT_GRAVITY_CENTERED_BIT_EXT,
-                .presentGravityY = VK_PRESENT_GRAVITY_CENTERED_BIT_EXT,
-            };
-
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSwapchainCreateInfoKHR.html#_description
             const VkSwapchainCreateInfoKHR swapchain_info{
                 .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
-                .pNext = &scaling_info,
+                .pNext = {},
                 .flags = {},
                 .surface = gfx.surface,
                 .minImageCount = num_images,
@@ -1146,7 +1125,7 @@ namespace cvk
                 .imageSharingMode = queue_sharing,
                 .queueFamilyIndexCount = queue_concurrent_count,
                 .pQueueFamilyIndices = queue_indices_ptr,
-                .preTransform = gfx.surface_caps.surfaceCapabilities.currentTransform,
+                .preTransform = gfx.ds_capabilities.surfaceCapabilities.currentTransform,
                 .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
                 .presentMode = gfx.surface_present,
                 .clipped = VK_TRUE,
@@ -1754,7 +1733,7 @@ namespace cvk
 
         #if defined(CGE_DEBUG)
         {
-            [[maybe_unused]] const VkPhysicalDeviceProperties& props{ ctx.device_properties[gfx.sel_device] };
+            const VkPhysicalDeviceProperties& props{ ctx.device_properties[gfx.sel_device] };
             CGE_LOG("[CGE] Selected: \"{}\"\n", props.deviceName);
         }
         #endif
@@ -1885,12 +1864,14 @@ namespace cvk
 
         const shaderc::SpvCompilationResult res_compile{ compiler.CompileGlslToSpv(source.c_str(), source.size(), shader_kind, file_name, shader_entry, options) };
         const shaderc_compilation_status status{ res_compile.GetCompilationStatus() };
+    #if defined(CGE_DEBUG)
         if (status != shaderc_compilation_status_success)
         {
-            [[maybe_unused]] const std::size_t num_errors{ res_compile.GetNumErrors() };
-            [[maybe_unused]] const std::size_t num_warnings{ res_compile.GetNumWarnings() };
+            const std::size_t num_errors{ res_compile.GetNumErrors() };
+            const std::size_t num_warnings{ res_compile.GetNumWarnings() };
             CGE_LOG("[CGE] SPIR-V Compilation Error! ({} Errors, {} Warnings)\n  {}{}\n", num_errors, num_warnings, file_dir, res_compile.GetErrorMessage());
         }
+    #endif
         CGE_ASSERT(status == shaderc_compilation_status_success);
         
         const std::vector<cvk::Offset> code{ res_compile.cbegin(), res_compile.cend() };
@@ -1965,8 +1946,16 @@ namespace cvk
         CGE_ASSERT(false);
     }
 
-    VkExtent2D full_resolution [[maybe_unused]] (const VkSurfaceCapabilitiesKHR& caps) noexcept
+    VkExtent2D full_resolution(cvk::Context& ctx, cvk::Renderable& gfx, const bool update) noexcept
     {
+        VkSurfaceCapabilitiesKHR& caps{ gfx.ds_capabilities.surfaceCapabilities };
+
+        if (update)
+        {
+            const VkResult res_caps{ vkGetPhysicalDeviceSurfaceCapabilitiesKHR(ctx.devices[gfx.sel_device], gfx.surface, &caps) };
+            CGE_ASSERT(res_caps == VK_SUCCESS);
+        }
+
         if ((caps.currentExtent.width == cvk::special_value) && (caps.currentExtent.height == cvk::special_value))
         {
             return caps.maxImageExtent;

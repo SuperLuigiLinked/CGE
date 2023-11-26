@@ -54,11 +54,7 @@ namespace cge
 
         if (window)
         {
-            const VkExtent2D framebuffer_extent{
-                .width = static_cast<cvk::Offset>(engine.settings.width),
-                .height = static_cast<cvk::Offset>(engine.settings.height),
-            };
-            cvk::create_renderable(self.ctx, self.gfx, window, framebuffer_extent, engine.settings.vsync);
+            cvk::create_renderable(self.ctx, self.gfx, window, engine.settings.vsync);
         }
     }
 
@@ -66,14 +62,13 @@ namespace cge
     {
         constexpr unsigned max_attempts{ 8 };
 
-        const VkExtent2D req_size{
-            .width = engine.scene.res_w,
-            .height = engine.scene.res_h,
-        };
-        
-        if ((req_size.width != self.gfx.surface_extent.width) || (req_size.width != self.gfx.surface_extent.width))
+        const VkExtent2D cur_extent{ cvk::full_resolution(self.ctx, self.gfx, true) };
+        if (!(cur_extent.width && cur_extent.height)) return;
+
+        if ((cur_extent.width != self.gfx.surface_extent.width) || (cur_extent.height != self.gfx.surface_extent.height) || (engine.cached_vsync != self.gfx.surface_vsync))
         {
-            cvk::remake_swapchain(self.ctx, self.gfx, req_size, engine.cached_vsync);
+            cvk::remake_swapchain(self.ctx, self.gfx, engine.cached_vsync);
+            if (!(self.gfx.surface_extent.width && self.gfx.surface_extent.height)) return;
         }
 
         for (unsigned attempts{}; attempts < max_attempts; ++attempts)
@@ -82,14 +77,15 @@ namespace cge
             if (res_render == VK_SUCCESS) return;
             if (cge::quitting(engine)) return;
 
+            cvk::remake_swapchain(self.ctx, self.gfx, engine.cached_vsync);
+            if (!(self.gfx.surface_extent.width && self.gfx.surface_extent.height)) return;
+
             if (res_render == VK_ERROR_OUT_OF_DATE_KHR)
             {
-                cvk::remake_swapchain(self.ctx, self.gfx, req_size, engine.cached_vsync);
                 continue;
             }
             else if (res_render == VK_SUBOPTIMAL_KHR)
             {
-                cvk::remake_swapchain(self.ctx, self.gfx, req_size, engine.cached_vsync);
                 return;
             }
             else

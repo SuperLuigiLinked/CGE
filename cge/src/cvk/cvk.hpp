@@ -77,7 +77,6 @@ namespace cvk
     #endif
         VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME, ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_KHR_get_physical_device_properties2.html
         VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME, ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_KHR_get_surface_capabilities2.html
-        VK_EXT_SURFACE_MAINTENANCE_1_EXTENSION_NAME, ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_EXT_surface_maintenance1.html
 
     #if defined(CGE_VALIDATE_VK)
         VK_EXT_DEBUG_UTILS_EXTENSION_NAME, ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_EXT_debug_utils.html
@@ -89,7 +88,6 @@ namespace cvk
         VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME, ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_KHR_portability_subset.html
     #endif
         VK_KHR_SWAPCHAIN_EXTENSION_NAME, ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_KHR_swapchain.html
-        VK_EXT_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME, ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_EXT_swapchain_maintenance1.html
     };
 
 #if defined(CGE_VALIDATE_VK)    
@@ -162,9 +160,6 @@ namespace cvk
         void* context; ///< HINSTANCE | Display* | xcb_connection_t* | wl_display* | NSView*
 
         VkSurfaceKHR surface; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSurfaceKHR.html
-        VkExtent2D         surface_extent ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkExtent2D.html
-        VkSurfaceFormatKHR surface_format ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSurfaceFormatKHR.html
-        VkPresentModeKHR   surface_present; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPresentModeKHR.html
 
         Offset   sel_device  ;
         Offset   sel_graphics;
@@ -173,19 +168,24 @@ namespace cvk
         VkQueue  queue_graphics; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkQueue.html
         VkQueue  queue_present ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkQueue.html
 
-        Offset                   ds_present_count;
-        Offset                   ds_formats_count;
-        VkPresentModeKHR*        ds_present_array; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPresentModeKHR.html
-        VkSurfaceFormatKHR*      ds_formats_array; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSurfaceFormatKHR.html
-        VkSurfaceCapabilities2KHR              surface_caps; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSurfaceCapabilities2KHR.html
-        VkSurfacePresentScalingCapabilitiesEXT scaling_caps; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSurfacePresentScalingCapabilitiesEXT.html
-
+        Offset                    ds_present_count;
+        Offset                    ds_formats_count;
+        VkPresentModeKHR*         ds_present_array; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPresentModeKHR.html
+        VkSurfaceFormatKHR*       ds_formats_array; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSurfaceFormatKHR.html
+        VkSurfaceCapabilities2KHR ds_capabilities ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSurfaceCapabilities2KHR.html
+        
+        VkSurfaceFormatKHR surface_format ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSurfaceFormatKHR.html
+        VkPresentModeKHR   surface_present; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPresentModeKHR.html
+        VkExtent2D         surface_extent ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkExtent2D.html
+        bool               surface_vsync  ;
+        
         VkBuffer             buffer_main    ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkBuffer.html
         VkDeviceMemory       buffer_memory  ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDeviceMemory.html
         VkDeviceSize         buffer_capacity; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDeviceSize.html
         VkMemoryRequirements buffer_memreqs ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkMemoryRequirements.html
 
-        VkCommandPool         command_pool          ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkCommandPool.html
+        VkCommandPool command_pool; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkCommandPool.html
+        VkRenderPass  render_pass ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkRenderPass.html
 
         VkSwapchainKHR   swapchain       ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSwapchainKHR.html
         Offset           frame_idx       ;
@@ -208,7 +208,6 @@ namespace cvk
 
         VkShaderModule        module_vertex         ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkShaderModule.html
         VkShaderModule        module_fragment       ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkShaderModule.html
-        VkRenderPass          render_pass           ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkRenderPass.html
         VkDescriptorSetLayout descriptor_layout     ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDescriptorSetLayout.html
         VkDescriptorPool      descriptor_pool       ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDescriptorPool.html
         VkDescriptorSet       descriptor_set        ; ///< https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDescriptorSet.html
@@ -229,11 +228,14 @@ namespace cvk
     extern void create_context(cvk::Context& ctx) noexcept;
     extern void destroy_context(cvk::Context& ctx) noexcept;
 
-    extern void create_renderable(cvk::Context& ctx, cvk::Renderable& gfx, wyn_window_t window, VkExtent2D size, bool vsync) noexcept;
+    extern void create_renderable(cvk::Context& ctx, cvk::Renderable& gfx, wyn_window_t window, bool vsync) noexcept;
     extern void destroy_renderable(cvk::Context& ctx, cvk::Renderable& gfx) noexcept;
 
     extern void upload_texture(cvk::Context& ctx, cvk::Renderable& gfx, Offset atlas_idx, cge::Texture tex) noexcept;
 
     extern VkResult render_frame(cvk::Context& ctx, cvk::Renderable& gfx, const cge::Scene& scene) noexcept;
-    extern void remake_swapchain(cvk::Context& ctx, cvk::Renderable& gfx, VkExtent2D new_size, bool vsync) noexcept;
+
+    extern void remake_swapchain(cvk::Context& ctx, cvk::Renderable& gfx, bool vsync) noexcept;
+    extern VkExtent2D full_resolution(cvk::Context& ctx, cvk::Renderable& gfx, bool update) noexcept;
+
 }
