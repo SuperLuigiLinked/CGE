@@ -30,8 +30,8 @@ int main()
     const cge::Settings settings
     {
         .name = "CGE - Example",
-        .width = 1280.0,
-        .height = 720.0,
+        .width  = 1280.0,
+        .height =  720.0,
         .fps = 60.0,
         .vsync = true,
         .fullscreen = false,
@@ -65,13 +65,23 @@ void App::render([[maybe_unused]] cge::Engine& engine)
     ++this->renders;
     
     scene.clear();
-    scene.backcolor = cge::rgba(
+    scene.backcolor = 0xFF000000;
+
+    const cge::Color backcolor = cge::rgba(
         255 - std::abs(255 - int((this->updates / 2) % 510)),
         255 - std::abs(255 - int((this->updates    ) % 510)),
         255 - std::abs(255 - int((this->updates * 2) % 510)),
         255
     );
-    //scene.backcolor = 0xFF000040;
+    scene.draw_strip(
+        std::array
+        {
+            cge::Vertex{ .xyzw = { -1.0f, -1.0f, 1.0f }, .st = { backcolor } },
+            cge::Vertex{ .xyzw = {  1.0f, -1.0f, 1.0f }, .st = { backcolor } },
+            cge::Vertex{ .xyzw = { -1.0f,  1.0f, 1.0f }, .st = { backcolor } },
+            cge::Vertex{ .xyzw = {  1.0f,  1.0f, 1.0f }, .st = { backcolor } },
+        }
+    );
 
     [[maybe_unused]] constexpr float pi{ std::numbers::pi_v<float> };
     [[maybe_unused]] constexpr float tau{ pi + pi };

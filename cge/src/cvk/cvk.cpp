@@ -968,12 +968,18 @@ namespace cvk
             .width = float(gfx.surface_extent.width),
             .height = float(gfx.surface_extent.height),
             .minDepth = 0.0f,
-            .maxDepth = 0.0f,
+            .maxDepth = 1.0f,
         };
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkRect2D.html
         const VkRect2D scissor{
-            .offset = { 0, 0 },
-            .extent = gfx.surface_extent,
+            .offset = {
+                .x = 0,
+                .y = 0
+            },
+            .extent = {
+                .width = gfx.surface_extent.width,
+                .height = gfx.surface_extent.height,
+            },
         };
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPipelineViewportStateCreateInfo.html
         const VkPipelineViewportStateCreateInfo viewport_info{
@@ -1073,7 +1079,7 @@ namespace cvk
         VkGraphicsPipelineCreateInfo pipeline_triangle_list{ default_pipeline };
         pipeline_triangle_list.pInputAssemblyState = &assembly_triangle_list;
         
-        const std::array<VkGraphicsPipelineCreateInfo, num_pipelines> pipeline_infos{
+        const std::array<VkGraphicsPipelineCreateInfo, cvk::num_pipelines> pipeline_infos{
             pipeline_triangle_list,
         };
 
@@ -2047,24 +2053,71 @@ namespace cvk
 
         // ----------------------------------------------------------------
 
+        enum class Scaling { none, fit, aspect, nearest };
+        constexpr Scaling scale_type{ Scaling::aspect };
+
+        const float ww{ float(gfx.surface_extent.width) };
+        const float wh{ float(gfx.surface_extent.height) };
+        const float rw{ float(scene.res_w) };
+        const float rh{ float(scene.res_h) };
+        const float sx{ ww / rw };
+        const float sy{ wh / rh };
+        const float sa{ std::min(sx, sy) };
+        const float sn{ sa < 1.0f ? sa : std::floor(sa) };
+        float vw{ rw };
+        float vh{ rh };
+        switch (scale_type)
+        {
+        case Scaling::fit:
+            vw *= sx;
+            vh *= sy;
+            break;
+        case Scaling::aspect:
+            vw *= sa;
+            vh *= sa;
+            break;
+        case Scaling::nearest:
+            vw *= sn;
+            vh *= sn;
+            break;
+        default:
+            break;
+        }
+        const float vx{ (ww - vw) / 2 };
+        const float vy{ (wh - vh) / 2 };
+
+        // ----------------------------------------------------------------
+
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkViewport.html
         const VkViewport viewport{
-            .x = 0.0f,
-            .y = 0.0f,
-            .width = float(gfx.surface_extent.width),
-            .height = float(gfx.surface_extent.height),
+            .x      = vx,
+            .y      = vy,
+            .width  = vw,
+            .height = vh,
             .minDepth = 0.0f,
-            .maxDepth = 0.0f,
+            .maxDepth = 1.0f,
         };
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkRect2D.html
         const VkRect2D scissor{
-            .offset = { 0, 0 },
-            .extent = gfx.surface_extent,
+            .offset = {
+                .x = 0,
+                .y = 0,//int(gfx.surface_extent.height * 3 / 4),
+            },
+            .extent = {
+                .width = gfx.surface_extent.width,
+                .height = gfx.surface_extent.height,
+            },
         };
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkRect2D.html
         const VkRect2D image_rect{
-            .offset = { 0, 0 },
-            .extent = gfx.surface_extent,
+            .offset = {
+                .x = 0,
+                .y = 0
+            },
+            .extent = {
+                .width = gfx.surface_extent.width,
+                .height = gfx.surface_extent.height,
+            },
         };
 
         const std::uint32_t clr_b{ (scene.backcolor      ) & 0xFF };
@@ -2090,37 +2143,37 @@ namespace cvk
         using IndexSpan = std::span<const cge::Index>;
         using ByteSpan = std::span<const std::byte>;
 
-        const std::array<VertexSpan, num_pipelines> vertices{
+        const std::array<VertexSpan, cvk::num_pipelines> vertices{
             /* Triangles */ VertexSpan{scene.vertices},
         };
 
-        const std::array<IndexSpan, num_pipelines> indices{
+        const std::array<IndexSpan, cvk::num_pipelines> indices{
             /* Triangles */ IndexSpan{scene.indices},
         };
 
-        const std::array<ByteSpan, num_pipelines> vtx_bytes{
+        const std::array<ByteSpan, cvk::num_pipelines> vtx_bytes{
             /* Triangles */ std::as_bytes(std::span{scene.vertices}),
         };
-        const std::array<ByteSpan, num_pipelines> idx_bytes{
+        const std::array<ByteSpan, cvk::num_pipelines> idx_bytes{
             /* Triangles */ std::as_bytes(std::span{scene.indices}),
         };
 
-        const std::array<VkDescriptorSet, num_pipelines> descriptor_sets{
+        const std::array<VkDescriptorSet, cvk::num_pipelines> descriptor_sets{
             /* Triangles */ gfx.descriptor_set,
         };
 
-        const std::array<VkPipeline, num_pipelines> pipeline_handles{
+        const std::array<VkPipeline, cvk::num_pipelines> pipeline_handles{
             /* Triangles */ gfx.pipelines_graphics[0],
         };
 
-        const std::array<VkPipelineLayout, num_pipelines> pipeline_layouts{
+        const std::array<VkPipelineLayout, cvk::num_pipelines> pipeline_layouts{
             /* Triangles */ gfx.pipeline_layout,
         };
 
         // ----------------------------------------------------------------
 
-        std::array<VkDeviceSize, num_pipelines> vtx_offs{};
-        std::array<VkDeviceSize, num_pipelines> idx_offs{};
+        std::array<VkDeviceSize, cvk::num_pipelines> vtx_offs{};
+        std::array<VkDeviceSize, cvk::num_pipelines> idx_offs{};
 
         const VkDeviceMemory buffer_memory{ gfx.buffer_memory };
         const VkDeviceSize buffer_offs{ 0 };
@@ -2134,7 +2187,7 @@ namespace cvk
             {
                 VkDeviceSize offset{};
 
-                for (std::size_t idx{}; idx < num_pipelines; ++idx)
+                for (std::size_t idx{}; idx < cvk::num_pipelines; ++idx)
                 {
                     const VkDeviceSize rel_offs{ offset - buffer_offs };
                     const VkDeviceSize rel_size{ static_cast<VkDeviceSize>(vtx_bytes[idx].size()) };
@@ -2144,7 +2197,7 @@ namespace cvk
                     vtx_offs[idx] = cvk::map_bytes(buffer_size, buffer, offset, vtx_bytes[idx]);
                 }
 
-                for (std::size_t idx{}; idx < num_pipelines; ++idx)
+                for (std::size_t idx{}; idx < cvk::num_pipelines; ++idx)
                 {
                     const VkDeviceSize rel_offs{ offset - buffer_offs };
                     const VkDeviceSize rel_size{ static_cast<VkDeviceSize>(idx_bytes[idx].size()) };
@@ -2189,8 +2242,16 @@ namespace cvk
             // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCmdBeginRenderPass.html
             vkCmdBeginRenderPass(command_buffer, &pass_info, VK_SUBPASS_CONTENTS_INLINE);
             {
-                for (std::size_t idx{}; idx < num_pipelines; ++idx)
+                for (std::size_t idx{}; idx < cvk::num_pipelines; ++idx)
                 {
+                    const VkDeviceSize vtx_offset{ vtx_offs[idx] };
+                    const VkDeviceSize idx_offset{ idx_offs[idx] };
+                    const VkDescriptorSet desc_set{ descriptor_sets[idx] };
+                    const VkPipelineLayout layout{ pipeline_layouts[idx] };
+                    const cvk::Offset vtx_count{ static_cast<cvk::Offset>(vertices[idx].size()) };
+                    const cvk::Offset idx_count{ static_cast<cvk::Offset>(indices[idx].size()) };
+                    const bool has_idx{ indices[idx].data() != nullptr };
+
                     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCmdBindPipeline.html
                     vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_handles[idx]);
 
@@ -2199,14 +2260,6 @@ namespace cvk
 
                     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCmdSetScissor.html
                     vkCmdSetScissor(command_buffer, 0, 1, &scissor);
-
-                    const VkDeviceSize vtx_offset{ vtx_offs[idx] };
-                    const VkDeviceSize idx_offset{ idx_offs[idx] };
-                    const VkDescriptorSet desc_set{ descriptor_sets[idx] };
-                    const VkPipelineLayout layout{ pipeline_layouts[idx] };
-                    const cvk::Offset vtx_count{ static_cast<cvk::Offset>(vertices[idx].size()) };
-                    const cvk::Offset idx_count{ static_cast<cvk::Offset>(indices[idx].size()) };
-                    const bool has_idx{ indices[idx].data() != nullptr };
 
                     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCmdBindVertexBuffers.html
                     vkCmdBindVertexBuffers(command_buffer, 0, 1, &gfx.buffer_main, &vtx_offset);
