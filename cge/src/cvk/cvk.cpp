@@ -1101,7 +1101,7 @@ namespace cvk
         const cvk::Offset min_images{ gfx.ds_capabilities.surfaceCapabilities.minImageCount };
         const cvk::Offset max_images{ gfx.ds_capabilities.surfaceCapabilities.maxImageCount };
         const cvk::Offset req_images{ 2 };
-        const cvk::Offset num_images{ (max_images == 0) ? req_images : std::clamp(req_images, min_images, max_images) };
+        const cvk::Offset num_images{ (max_images == 0) ? std::max(req_images, min_images) : std::clamp(req_images, min_images, max_images) };
 
         const bool queues_unique{ gfx.sel_graphics != gfx.sel_present };
         const cvk::Offset queue_concurrent_count{ static_cast<cvk::Offset>(queues_unique ? 2 : 0) };
