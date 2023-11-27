@@ -25,7 +25,6 @@
     #include <vulkan/vulkan_beta.h>
 #endif
 #if defined(_WIN32)
-    #define _CRT_SECURE_NO_WARNINGS
     #undef min
     #undef max
     #undef near

@@ -14,6 +14,84 @@ namespace cge
 
 namespace cge
 {
+    extern Viewport viewport(
+        const std::uint32_t window_w,
+        const std::uint32_t window_h,
+        const std::uint32_t render_w,
+        const std::uint32_t render_h,
+        const Scaling scaling
+    ) noexcept
+    {
+        Viewport view{};
+
+        if (render_w && render_h)
+        {
+            switch (scaling)
+            {
+            case cge::Scaling::none:
+            {
+                view.w = render_w;
+                view.h = render_h;
+            }
+            break;
+            case cge::Scaling::fit:
+            {
+                view.w = window_w;
+                view.h = window_h;
+            }
+            break;
+            case cge::Scaling::aspect:
+            {
+                const float scale_x{ float(window_w) / float(render_w) };
+                const float scale_y{ float(window_h) / float(render_h) };
+                const float scale_aspect{ std::min(scale_x, scale_y) };
+
+                view.w = std::uint32_t(float(render_w) * float(scale_aspect));
+                view.h = std::uint32_t(float(render_h) * float(scale_aspect));
+            }
+            break;
+            case cge::Scaling::aspect_exact:
+            {
+                const std::uint32_t aspect_factor{ std::gcd(render_w, render_h) };
+                const std::uint32_t aspect_w{ render_w / aspect_factor };
+                const std::uint32_t aspect_h{ render_h / aspect_factor };
+                const float scale_x{ (float(window_w) - float(render_w)) / float(aspect_w) };
+                const float scale_y{ (float(window_h) - float(render_h)) / float(aspect_h) };
+                const float scale_min{ std::min(scale_x, scale_y) };
+                const float scale_exact{ std::floor(scale_min) };
+
+                view.w = std::uint32_t(std::int32_t(render_w) + std::int32_t(aspect_w) * std::int32_t(scale_exact));
+                view.h = std::uint32_t(std::int32_t(render_h) + std::int32_t(aspect_h) * std::int32_t(scale_exact));
+
+                view.w = std::max(view.w, aspect_w);
+                view.h = std::max(view.h, aspect_h);
+            }
+            break;
+            case cge::Scaling::exact:
+            {
+                const std::uint32_t scale_x{ window_w / render_w };
+                const std::uint32_t scale_y{ window_h / render_h };
+                const std::uint32_t scale_min{ std::min(scale_x, scale_y) };
+                const std::uint32_t scale_nearest{ std::max(1u, scale_min) };
+
+                view.w = render_w * scale_nearest;
+                view.h = render_h * scale_nearest;
+            }
+            break;
+            }
+        }
+        
+        view.w = std::max(view.w, 1u);
+        view.h = std::max(view.h, 1u);
+        view.x = std::int32_t(window_w - view.w) / 2;
+        view.y = std::int32_t(window_h - view.h) / 2;
+
+        return view;
+    }
+}
+
+namespace cge
+{
     void run(cge::Game& game, const cge::Settings& settings)
     {
         cge::Engine engine{

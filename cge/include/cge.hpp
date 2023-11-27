@@ -11,9 +11,10 @@
 #include <cstddef>
 #include <cstdint>
 #include <cmath>
-#include <span>
-#include <array>
+#include <numeric>
 #include <vector>
+#include <array>
+#include <span>
 
 namespace cge
 {
@@ -111,6 +112,22 @@ namespace cge
 
 namespace cge
 {
+    enum class Scaling
+    {
+        none, ///< No scaling is performed.
+        fit, ///< The scene is scaled to fit the window exactly.
+        aspect, ///< The scene is scaled to fit at least one window dimension, preserving Aspect Ratio as closely as possible.
+        aspect_exact, ///< The scene is scaled, preserving Aspect Ratio exactly.
+        exact, ///< The scene is scaled only by integer multiples.
+    };
+
+    struct Viewport { std::int32_t x, y; std::uint32_t w, h; };
+    
+    extern Viewport viewport(std::uint32_t window_w, std::uint32_t window_h, std::uint32_t render_w, std::uint32_t render_h, Scaling scaling) noexcept;
+}
+
+namespace cge
+{
     struct Settings
     {
         const char* name;
@@ -127,8 +144,9 @@ namespace cge
 
         std::uint32_t res_w;
         std::uint32_t res_h;
-        cge::Color backcolor;
+        cge::Scaling scaling;
 
+        cge::Color backcolor;
         std::vector<cge::Vertex> vertices;
         std::vector<cge::Index> indices;
 
@@ -164,9 +182,18 @@ namespace cge
             for (cge::Index rel{ 2 }; rel < vtx_list.size(); ++rel)
             {
                 vertices.push_back(vtx_list[rel]);
-                indices.push_back(base + rel - 2);
-                indices.push_back(base + rel - 1);
-                indices.push_back(base + rel);
+                if (rel % 2 == 0)
+                {
+                    indices.push_back(base + rel - 2);
+                    indices.push_back(base + rel - 1);
+                    indices.push_back(base + rel);
+                }
+                else
+                {
+                    indices.push_back(base + rel - 2);
+                    indices.push_back(base + rel);
+                    indices.push_back(base + rel - 1);
+                }
             }
         }
 

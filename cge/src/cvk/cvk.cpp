@@ -3,10 +3,10 @@
  */
 
 #include <cstring>
+#include <cstdio>
 
-#include <algorithm>
 #include <filesystem>
-#include <fstream>
+#include <algorithm>
 #include <string>
 
 #include "cvk.hpp"
@@ -82,7 +82,7 @@ namespace cvk
     static bool str_equal(const char* a, const char* b) noexcept;
     static bool has_extensions(std::span<const VkExtensionProperties> sup_exts, std::span<const char* const> req_exts) noexcept;
     static bool has_layers(std::span<const VkLayerProperties> sup_lyrs, std::span<const char* const> req_lyrs) noexcept;
-    static std::string load_txt(const char* filepath) noexcept;
+    static std::vector<char> load_file(const char* filepath) noexcept;
     static void compile_spirv(cvk::Context& ctx, cvk::Renderable& gfx, VkShaderModule& module, const shaderc::Compiler& compiler, const shaderc::CompileOptions& options, const std::string& file_dir, const char* file_name, shaderc_shader_kind shader_kind) noexcept;
     static VkDeviceSize map_bytes(VkDeviceSize buffer_size, void* const buffer, VkDeviceSize& offs, std::span<const std::byte> bytes) noexcept;
     static cvk::Offset find_memtype(std::span<const VkMemoryType> mem_types, cvk::Offset alloc_type, cvk::Offset alloc_props) noexcept;
@@ -1000,8 +1000,8 @@ namespace cvk
             .depthClampEnable = VK_FALSE,
             .rasterizerDiscardEnable = VK_FALSE,
             .polygonMode = VK_POLYGON_MODE_FILL,
-            .cullMode = VK_CULL_MODE_NONE,
-            .frontFace = VK_FRONT_FACE_CLOCKWISE,
+            .cullMode = VK_CULL_MODE_NONE, // VK_CULL_MODE_BACK_BIT,
+            .frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
             .depthBiasEnable = VK_FALSE,
             .depthBiasConstantFactor = 0.0f,
             .depthBiasClamp = 0.0f,
@@ -1849,18 +1849,44 @@ namespace cvk
         return true;
     }
 
-    std::string load_txt(const char* const filepath) noexcept
+    std::vector<char> load_file(const char* const filepath) noexcept
     {
-        std::string txt{};
-        std::ifstream file{ filepath };
-        std::getline(file, txt, '\0');
-        return txt;
+        std::vector<char> buffer{};
+        {
+            std::FILE* const file{ std::fopen(filepath, "rb") };
+            if (file)
+            {
+                try
+                {
+                    const int res_seek{ std::fseek(file, 0, SEEK_END) };
+                    if (res_seek == 0)
+                    {
+                        const long res_tell{ std::ftell(file) };
+                        if (res_tell != -1L)
+                        {
+                            const std::size_t length{ static_cast<std::size_t>(res_tell) };
+                            buffer.resize(length);
+                            
+                            std::rewind(file);
+                            const std::size_t res_read{ std::fread(buffer.data(), sizeof(char), length, file) };
+                            buffer.resize(res_read);
+                        }
+                    }
+                }
+                catch (...)
+                {}
+
+                const int res_close{ std::fclose(file) };
+                (void)res_close;
+            }
+        }
+        return buffer;
     }
 
     void compile_spirv(cvk::Context& ctx, cvk::Renderable& gfx, VkShaderModule& module, const shaderc::Compiler& compiler, const shaderc::CompileOptions& options, const std::string& file_dir, const char* const file_name, const shaderc_shader_kind shader_kind) noexcept
     {
         const std::string file_path{ file_dir + file_name };
-        const std::string source{ cvk::load_txt(file_path.c_str()) };
+        const std::vector<char> source{ cvk::load_file(file_path.c_str()) };
         if (source.empty())
         {
             const std::string full_path{ std::filesystem::current_path().append(file_path).lexically_normal().string() };
@@ -1868,7 +1894,7 @@ namespace cvk
         }
         CGE_ASSERT(!source.empty());
 
-        const shaderc::SpvCompilationResult res_compile{ compiler.CompileGlslToSpv(source.c_str(), source.size(), shader_kind, file_name, shader_entry, options) };
+        const shaderc::SpvCompilationResult res_compile{ compiler.CompileGlslToSpv(source.data(), source.size(), shader_kind, file_name, shader_entry, options) };
         const shaderc_compilation_status status{ res_compile.GetCompilationStatus() };
     #if defined(CGE_DEBUG)
         if (status != shaderc_compilation_status_success)
@@ -2053,47 +2079,14 @@ namespace cvk
 
         // ----------------------------------------------------------------
 
-        enum class Scaling { none, fit, aspect, nearest };
-        constexpr Scaling scale_type{ Scaling::aspect };
-
-        const float ww{ float(gfx.surface_extent.width) };
-        const float wh{ float(gfx.surface_extent.height) };
-        const float rw{ float(scene.res_w) };
-        const float rh{ float(scene.res_h) };
-        const float sx{ ww / rw };
-        const float sy{ wh / rh };
-        const float sa{ std::min(sx, sy) };
-        const float sn{ sa < 1.0f ? sa : std::floor(sa) };
-        float vw{ rw };
-        float vh{ rh };
-        switch (scale_type)
-        {
-        case Scaling::fit:
-            vw *= sx;
-            vh *= sy;
-            break;
-        case Scaling::aspect:
-            vw *= sa;
-            vh *= sa;
-            break;
-        case Scaling::nearest:
-            vw *= sn;
-            vh *= sn;
-            break;
-        default:
-            break;
-        }
-        const float vx{ (ww - vw) / 2 };
-        const float vy{ (wh - vh) / 2 };
-
-        // ----------------------------------------------------------------
-
+        const cge::Viewport view{ cge::viewport(gfx.surface_extent.width, gfx.surface_extent.height, scene.res_w, scene.res_h, scene.scaling) };
+        
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkViewport.html
         const VkViewport viewport{
-            .x      = vx,
-            .y      = vy,
-            .width  = vw,
-            .height = vh,
+            .x      = float(view.x),
+            .y      = float(view.y),
+            .width  = float(view.w),
+            .height = float(view.h),
             .minDepth = 0.0f,
             .maxDepth = 1.0f,
         };
@@ -2101,7 +2094,7 @@ namespace cvk
         const VkRect2D scissor{
             .offset = {
                 .x = 0,
-                .y = 0,//int(gfx.surface_extent.height * 3 / 4),
+                .y = 0,
             },
             .extent = {
                 .width = gfx.surface_extent.width,

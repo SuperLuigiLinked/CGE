@@ -65,6 +65,10 @@ void App::render([[maybe_unused]] cge::Engine& engine)
     ++this->renders;
     
     scene.clear();
+    
+    scene.res_w = 1280;
+    scene.res_h =  720;
+    scene.scaling = cge::Scaling::aspect;
     scene.backcolor = 0xFF000000;
 
     const cge::Color backcolor = cge::rgba(
@@ -76,10 +80,10 @@ void App::render([[maybe_unused]] cge::Engine& engine)
     scene.draw_strip(
         std::array
         {
-            cge::Vertex{ .xyzw = { -1.0f, -1.0f, 1.0f }, .st = { backcolor } },
             cge::Vertex{ .xyzw = {  1.0f, -1.0f, 1.0f }, .st = { backcolor } },
-            cge::Vertex{ .xyzw = { -1.0f,  1.0f, 1.0f }, .st = { backcolor } },
+            cge::Vertex{ .xyzw = { -1.0f, -1.0f, 1.0f }, .st = { backcolor } },
             cge::Vertex{ .xyzw = {  1.0f,  1.0f, 1.0f }, .st = { backcolor } },
+            cge::Vertex{ .xyzw = { -1.0f,  1.0f, 1.0f }, .st = { backcolor } },
         }
     );
 
@@ -88,21 +92,21 @@ void App::render([[maybe_unused]] cge::Engine& engine)
     
     [[maybe_unused]] constexpr float rad{ 0.4375f };
     [[maybe_unused]] const float rot{ float(secs) };
-    [[maybe_unused]] const float aspect{ float(settings.width / settings.height) };
+    [[maybe_unused]] const float aspect{ float(scene.res_w) / float(scene.res_h) };
 
     scene.draw_tri(
         std::array
         {
             cge::Vertex {
-                .xyzw = { std::cos((rot + 0.0f / 3.0f) * tau) * rad, std::sin((rot + 0.0f / 3.0f) * tau) * rad * aspect },
+                .xyzw = { std::cos((rot - 0.0f / 3.0f) * tau) * rad, std::sin((rot - 0.0f / 3.0f) * tau) * rad * aspect },
                 .st = { 0xFFFF0000 },
             },
             cge::Vertex {
-                .xyzw = { std::cos((rot + 1.0f / 3.0f) * tau) * rad, std::sin((rot + 1.0f / 3.0f) * tau) * rad * aspect },
+                .xyzw = { std::cos((rot - 1.0f / 3.0f) * tau) * rad, std::sin((rot - 1.0f / 3.0f) * tau) * rad * aspect },
                 .st = { 0xFF00FF00 },
             },
             cge::Vertex {
-                .xyzw = { std::cos((rot + 2.0f / 3.0f) * tau) * rad, std::sin((rot + 2.0f / 3.0f) * tau) * rad * aspect },
+                .xyzw = { std::cos((rot - 2.0f / 3.0f) * tau) * rad, std::sin((rot - 2.0f / 3.0f) * tau) * rad * aspect },
                 .st = { 0xFF0000FF },
             },
         }
@@ -111,10 +115,10 @@ void App::render([[maybe_unused]] cge::Engine& engine)
     scene.draw_strip(
         std::array
         {
-            cge::Vertex { .xyzw = { -1.00f, -0.75f }, .st = { 0xFFFF0000 }, },
+            cge::Vertex { .xyzw = { -0.50f,  0.75f }, .st = { 0xFFFFFF00 }, },
             cge::Vertex { .xyzw = { -0.50f, -0.75f }, .st = { 0xFF00FF00 }, },
             cge::Vertex { .xyzw = { -1.00f,  0.75f }, .st = { 0xFF0000FF }, },
-            cge::Vertex { .xyzw = { -0.50f,  0.75f }, .st = { 0xFFFFFF00 }, },
+            cge::Vertex { .xyzw = { -1.00f, -0.75f }, .st = { 0xFFFF0000 }, },
         }
     );
 
@@ -123,9 +127,9 @@ void App::render([[maybe_unused]] cge::Engine& engine)
         {
             cge::Vertex { .xyzw = {  0.75f,  0.00f }, .st = { 0xFF7F7F7F }, },
             cge::Vertex { .xyzw = {  1.00f,  0.00f }, .st = { 0xFFFF0000 }, },
-            cge::Vertex { .xyzw = {  0.75f,  0.75f }, .st = { 0xFF00FF00 }, },
-            cge::Vertex { .xyzw = {  0.50f,  0.00f }, .st = { 0xFF0000FF }, },
             cge::Vertex { .xyzw = {  0.75f, -0.75f }, .st = { 0xFFFFFF00 }, },
+            cge::Vertex { .xyzw = {  0.50f,  0.00f }, .st = { 0xFF0000FF }, },
+            cge::Vertex { .xyzw = {  0.75f,  0.75f }, .st = { 0xFF00FF00 }, },
             cge::Vertex { .xyzw = {  1.00f,  0.00f }, .st = { 0xFFFF0000 }, },
         }
     );

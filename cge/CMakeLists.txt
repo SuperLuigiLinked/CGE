@@ -69,6 +69,9 @@ if (APPLE)
 else()
     target_compile_options(cge PRIVATE "-Wno-cast-function-type-strict")
 endif()
+if (WIN32)
+    target_compile_definitions(cge PRIVATE "_CRT_SECURE_NO_WARNINGS")
+endif()
 
 # ================================================================================================================================
 
