@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <cmath>
 #include <numeric>
+#include <variant>
 #include <vector>
 #include <array>
 #include <span>
@@ -47,33 +48,33 @@ namespace cge
         uvec2 st;
     };
 
-    using Index = std::uint32_t;
+    using Index = cge::uint;
 
-    using Color = std::uint32_t;
+    using Color = cge::uint;
 }
 
 namespace cge
 {
-    static inline constexpr Color shift_r{ 16 };
-    static inline constexpr Color shift_g{  8 };
-    static inline constexpr Color shift_b{  0 };
-    static inline constexpr Color shift_a{ 24 };
+    static inline constexpr cge::Color shift_r{ 16 };
+    static inline constexpr cge::Color shift_g{  8 };
+    static inline constexpr cge::Color shift_b{  0 };
+    static inline constexpr cge::Color shift_a{ 24 };
 
-    static inline constexpr Color rgba(const float r, const float g, const float b, const float a = 1.0f) noexcept
+    static inline constexpr cge::Color rgba(const float r, const float g, const float b, const float a = 1.0f) noexcept
     {
-        return (Color(r * 255.0f) << shift_r)
-             | (Color(g * 255.0f) << shift_g)
-             | (Color(b * 255.0f) << shift_b)
-             | (Color(a * 255.0f) << shift_a)
+        return (cge::Color(r * 255.0f) << shift_r)
+             | (cge::Color(g * 255.0f) << shift_g)
+             | (cge::Color(b * 255.0f) << shift_b)
+             | (cge::Color(a * 255.0f) << shift_a)
         ;
     }
 
     static inline constexpr Color rgba(const int r, const int g, const int b, const int a = 255) noexcept
     {
-        return (Color(r) << shift_r)
-             | (Color(g) << shift_g)
-             | (Color(b) << shift_b)
-             | (Color(a) << shift_a)
+        return (cge::Color(r) << shift_r)
+             | (cge::Color(g) << shift_g)
+             | (cge::Color(b) << shift_b)
+             | (cge::Color(a) << shift_a)
         ;
     }
 
@@ -92,9 +93,9 @@ namespace cge
 {
     struct Texture
     {
-        std::uint32_t width;
-        std::uint32_t height;
-        const Color* data; // #AARRGGBB format (BGRA little-endian, ARGB big-endian)
+        cge::uint width;
+        cge::uint height;
+        const cge::Color* data; // #AARRGGBB format (BGRA little-endian, ARGB big-endian)
 
         inline constexpr std::size_t size() const noexcept
         { return std::size_t(this->width) * std::size_t(this->height); }
@@ -121,9 +122,9 @@ namespace cge
         exact, ///< The scene is scaled only by integer multiples.
     };
 
-    struct Viewport { std::int32_t x, y; std::uint32_t w, h; };
+    struct Viewport { cge::sint x, y; cge::uint w, h; };
     
-    extern Viewport viewport(std::uint32_t window_w, std::uint32_t window_h, std::uint32_t render_w, std::uint32_t render_h, Scaling scaling) noexcept;
+    extern cge::Viewport viewport(cge::uint window_w, cge::uint window_h, cge::uint render_w, cge::uint render_h, cge::Scaling scaling) noexcept;
 }
 
 namespace cge
@@ -142,8 +143,8 @@ namespace cge
     {
     public:
 
-        std::uint32_t res_w;
-        std::uint32_t res_h;
+        cge::uint res_w;
+        cge::uint res_h;
         cge::Scaling scaling;
 
         cge::Color backcolor;
@@ -218,15 +219,34 @@ namespace cge
 
 namespace cge
 {
+    struct EventReposition { double x, y, w, h; };
+    struct EventCursor { double x, y; };
+    struct EventScroll { double x, y; };
+    struct EventMouse  { unsigned short button; bool pressed; };
+    struct EventKeyboard { unsigned short keycode; bool pressed; };
+    struct EventText { const unsigned char* text; };
+
+    using Event = std::variant
+    <
+        cge::EventReposition,
+        cge::EventCursor,
+        cge::EventScroll,
+        cge::EventMouse,
+        cge::EventKeyboard,
+        cge::EventText
+    >;
+}
+
+namespace cge
+{
     class Engine;
 
-    extern void quit(Engine& engine) noexcept;
-    extern bool quitting(const Engine& engine) noexcept;
+    extern void quit(cge::Engine& engine) noexcept;
+    extern bool quitting(const cge::Engine& engine) noexcept;
 
-    extern Settings& settings(Engine& engine) noexcept;
-    extern Scene& scene(Engine& engine) noexcept;
+    extern cge::Settings& settings(cge::Engine& engine) noexcept;
 
-    extern double elapsed_seconds(const Engine& engine) noexcept;
+    extern double elapsed_seconds(const cge::Engine& engine) noexcept;
 }
 
 namespace cge
@@ -235,8 +255,9 @@ namespace cge
     {
     public:
         virtual ~Game() = default;
-        virtual void update(Engine& engine);
-        virtual void render(Engine& engine);
+        virtual void event(cge::Engine& engine, cge::Event event);
+        virtual void update(cge::Engine& engine);
+        virtual void render(cge::Engine& engine, cge::Scene& scene);
     };
 }
 
@@ -247,7 +268,7 @@ namespace cge
      * @warning MUST be called on the Main Thread.
      *          MUST NOT be called while the Engine is already running.
      */
-    void run(Game& game, const Settings& settings);
+    void run(cge::Game& game, const cge::Settings& settings);
 }
 
 #endif

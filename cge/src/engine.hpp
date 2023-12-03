@@ -41,18 +41,18 @@ namespace cge
     {
     public:
         virtual ~Renderer() = default;
-        virtual void target_window(Engine& engine, wyn_window_t window);
-        virtual void render(Engine& engine);
+        virtual void target_window(cge::Engine& engine, wyn_window_t window);
+        virtual void render(cge::Engine& engine);
     };
 
-    extern Renderer* renderer_vk();
+    extern cge::Renderer* renderer_vk();
 }
 
 namespace cge
 {
     using Signal = unsigned char;
 
-    enum SignalBits : Signal
+    enum SignalBits : cge::Signal
     {
         signal_quit   = 0b1,
         signal_render = 0b10,
@@ -66,21 +66,21 @@ namespace cge
     {
     public:
 
-        Game& game;
+        cge::Game& game;
         
-        Settings settings;
-        Scene scene;
+        cge::Settings settings;
+        cge::Scene scene;
         
         wyt_time_t epoch;
         wyn_window_t window;
         wyt_thread_t update_thread;
         wyt_thread_t render_thread;
 
-        std::unique_ptr<Renderer> renderer;
+        std::unique_ptr<cge::Renderer> renderer;
         double cached_fps;
         bool cached_vsync;
         
-        std::atomic<Signal> signal;
+        std::atomic<cge::Signal> signal;
     
     };
 }
