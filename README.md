@@ -21,27 +21,28 @@ Supports Windows, Linux, and MacOS, compiled with Clang + CMake.
 ## Example Code
 
 ```
-cge::Scene& scene = cge::scene(engine);
-
-scene.backcolor = 0xFF000040;
-
-scene.draw_tri(
-  std::array
-  {
-    cge::Vertex { .xyzw = { -1.0f, -1.0f }, .st = { 0xFFFF0000 } },
-    cge::Vertex { .xyzw = {  0.5f,  0.0f }, .st = { 0x00FF0000 } },
-    cge::Vertex { .xyzw = { -1.0f,  1.0f }, .st = { 0xFFFF0000 } },
-  }
-);
-
-scene.draw_tri(
-  std::array
-  {
-    cge::Vertex { .xyzw = {  1.0f, -1.0f }, .st = { 0xFF00FF00 } },
-    cge::Vertex { .xyzw = { -0.5f,  0.0f }, .st = { 0x0000FF00 } },
-    cge::Vertex { .xyzw = {  1.0f,  1.0f }, .st = { 0xFF00FF00 } },
-  }
-);
+void Game::render(cge::Engine& engine, cge::Scene& scene)
+{
+  scene.backcolor = 0xFF000040;
+  
+  scene.draw_tri(
+    std::array
+    {
+      cge::Vertex { .xyzw = { -1.0f, -1.0f }, .st = { 0xFFFF0000 } },
+      cge::Vertex { .xyzw = {  0.5f,  0.0f }, .st = { 0x00FF0000 } },
+      cge::Vertex { .xyzw = { -1.0f,  1.0f }, .st = { 0xFFFF0000 } },
+    }
+  );
+  
+  scene.draw_tri(
+    std::array
+    {
+      cge::Vertex { .xyzw = {  1.0f, -1.0f }, .st = { 0xFF00FF00 } },
+      cge::Vertex { .xyzw = { -0.5f,  0.0f }, .st = { 0x0000FF00 } },
+      cge::Vertex { .xyzw = {  1.0f,  1.0f }, .st = { 0xFF00FF00 } },
+    }
+  );
+}
 ```
 
 ---
