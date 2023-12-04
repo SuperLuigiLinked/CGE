@@ -219,6 +219,7 @@ namespace cge
 
 namespace cge
 {
+    struct EventInit {};
     struct EventReposition { double x, y, w, h; };
     struct EventCursor { double x, y; };
     struct EventScroll { double x, y; };
@@ -228,6 +229,7 @@ namespace cge
 
     using Event = std::variant
     <
+        cge::EventInit,
         cge::EventReposition,
         cge::EventCursor,
         cge::EventScroll,

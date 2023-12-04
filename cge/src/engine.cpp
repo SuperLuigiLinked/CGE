@@ -158,6 +158,8 @@ extern "C"
 
         engine.epoch = wyt_nanotime();
 
+        engine.game.event(engine, cge::EventInit{});
+
         engine.render_thread = wyt_spawn(cge::render_main, userdata);
         if (!engine.render_thread) return cge::quit(engine);
 

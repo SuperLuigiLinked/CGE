@@ -7,7 +7,7 @@ add_executable(cge_example)
 add_executable(cge::example ALIAS cge_example)
 
 target_sources(cge_example PRIVATE "example/main.cpp")
-target_link_libraries(cge_example cge::cge fmt::fmt)
+target_link_libraries(cge_example cge::cge wyn::wyn fmt::fmt)
 
 target_compile_features(cge_example PRIVATE cxx_std_23)
 
