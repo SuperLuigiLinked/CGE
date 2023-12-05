@@ -25,12 +25,14 @@ public:
     double window_h;
 
     bool window_focus;
+    bool cursor_focus;
+    bool cursor_hover;
 
     bool mb_L;
-    bool mb_M;
     bool mb_R;
+    bool mb_M;
     bool kb_Space;
-    bool cursor_focus;
+    
     double cursor_rot = { 11.0 / 16.0 };
     cge::dvec2 cursor_pos;
 
@@ -81,15 +83,6 @@ void App::event([[maybe_unused]] cge::Engine& engine, const cge::Event event)
     else if (const auto* const evt = std::get_if<cge::EventFocus>(&event))
     {
         this->window_focus = evt->focused;
-        
-        if (!evt->focused)
-        {
-            this->mb_L = false;
-            this->mb_M = false;
-            this->mb_R = false;
-            this->kb_Space = false;
-            this->cursor_focus = false;
-        }
     }
     else if (const auto* const evt = std::get_if<cge::EventReposition>(&event))
     {
@@ -100,15 +93,12 @@ void App::event([[maybe_unused]] cge::Engine& engine, const cge::Event event)
     }
     else if (const auto* const evt = std::get_if<cge::EventCursor>(&event))
     {
-        this->cursor_focus = true;
+        this->cursor_hover = (evt->x < this->window_w) && (evt->y < this->window_h);
         this->cursor_pos = { evt->x, evt->y };
     }
     else if (const auto* const evt = std::get_if<cge::EventCursorExit>(&event))
     {
-        this->cursor_focus = false;
-        this->mb_L = false;
-        this->mb_M = false;
-        this->mb_R = false;
+        this->cursor_hover = false;
     }
     else if (const auto* const evt = std::get_if<cge::EventScroll>(&event))
     {
@@ -127,6 +117,16 @@ void App::event([[maybe_unused]] cge::Engine& engine, const cge::Event event)
     else if (const auto* const evt = std::get_if<cge::EventText>(&event))
     {
 
+    }
+
+    this->cursor_focus = this->window_focus && (this->cursor_hover || (this->mb_L || this->mb_R || this->mb_M));
+    
+    if (!this->window_focus)
+    {
+        this->mb_L = false;
+        this->mb_R = false;
+        this->mb_M = false;
+        this->kb_Space = false;
     }
 }
 
