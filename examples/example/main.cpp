@@ -19,6 +19,13 @@ public:
     const wyn_vb_mapping_t* vb_map;
     const wyn_vk_mapping_t* vk_map;
 
+    double window_x;
+    double window_y;
+    double window_w;
+    double window_h;
+
+    bool window_focus;
+
     bool mb_L;
     bool mb_M;
     bool mb_R;
@@ -71,14 +78,37 @@ void App::event([[maybe_unused]] cge::Engine& engine, const cge::Event event)
         this->vb_map = wyn_vb_mapping();
         this->vk_map = wyn_vk_mapping();
     }
+    else if (const auto* const evt = std::get_if<cge::EventFocus>(&event))
+    {
+        this->window_focus = evt->focused;
+        
+        if (!evt->focused)
+        {
+            this->mb_L = false;
+            this->mb_M = false;
+            this->mb_R = false;
+            this->kb_Space = false;
+            this->cursor_focus = false;
+        }
+    }
     else if (const auto* const evt = std::get_if<cge::EventReposition>(&event))
     {
-
+        this->window_x = evt->x;
+        this->window_y = evt->y;
+        this->window_w = evt->w;
+        this->window_h = evt->h;
     }
     else if (const auto* const evt = std::get_if<cge::EventCursor>(&event))
     {
         this->cursor_focus = true;
         this->cursor_pos = { evt->x, evt->y };
+    }
+    else if (const auto* const evt = std::get_if<cge::EventCursorExit>(&event))
+    {
+        this->cursor_focus = false;
+        this->mb_L = false;
+        this->mb_M = false;
+        this->mb_R = false;
     }
     else if (const auto* const evt = std::get_if<cge::EventScroll>(&event))
     {
@@ -223,6 +253,29 @@ void App::render([[maybe_unused]] cge::Engine& engine, cge::Scene& scene)
                 cge::Vertex {
                     .xyzw = { cx + std::cos((rot - 2.0f / 3.0f) * tau) * rad, cy + std::sin((rot - 2.0f / 3.0f) * tau) * rad * aspect },
                     .st = { c2 },
+                },
+            }
+        );
+    }
+
+    if (!this->window_focus)
+    {
+        constexpr cge::Color fade{ 0xA0000000 };
+
+        scene.draw_tri(
+            std::array
+            {
+                cge::Vertex {
+                    .xyzw = { -1.0, -1.0 },
+                    .st = { fade },
+                },
+                cge::Vertex {
+                    .xyzw = { -1.0, 3.0 },
+                    .st = { fade },
+                },
+                cge::Vertex {
+                    .xyzw = { 3.0, -1.0 },
+                    .st = { fade },
                 },
             }
         );

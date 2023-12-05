@@ -231,6 +231,15 @@ extern "C"
         cge::quit(engine);
     }
 
+    void wyn_on_window_focus(void* const userdata, wyn_window_t const window, bool const focused)
+    {
+        cge::Engine& engine{ *static_cast<cge::Engine*>(userdata) };
+        if (window != engine.window) return;
+
+        const cge::Event event{ cge::EventFocus { focused } };
+        engine.game.event(engine, event);
+    }
+
     void wyn_on_window_reposition(void* const userdata, wyn_window_t const window, wyn_rect_t const content, wyn_coord_t const scale)
     {
         cge::Engine& engine{ *static_cast<cge::Engine*>(userdata) };
@@ -269,6 +278,15 @@ extern "C"
         const wyn_coord_t nrm_y{ (rel_y / wyn_coord_t(view.h)) * 2 - 1 };
 
         const cge::Event event{ cge::EventCursor { nrm_x, nrm_y } };
+        engine.game.event(engine, event);
+    }
+
+    void wyn_on_cursor_exit(void* const userdata, wyn_window_t const window)
+    {
+        cge::Engine& engine{ *static_cast<cge::Engine*>(userdata) };
+        if (window != engine.window) return;
+
+        const cge::Event event{ cge::EventCursorExit {} };
         engine.game.event(engine, event);
     }
     

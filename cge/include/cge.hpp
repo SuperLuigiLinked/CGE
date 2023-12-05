@@ -220,8 +220,10 @@ namespace cge
 namespace cge
 {
     struct EventInit {};
+    struct EventFocus { bool focused; };
     struct EventReposition { double x, y, w, h; };
     struct EventCursor { double x, y; };
+    struct EventCursorExit {};
     struct EventScroll { double x, y; };
     struct EventMouse  { unsigned short button; bool pressed; };
     struct EventKeyboard { unsigned short keycode; bool pressed; };
@@ -230,8 +232,10 @@ namespace cge
     using Event = std::variant
     <
         cge::EventInit,
+        cge::EventFocus,
         cge::EventReposition,
         cge::EventCursor,
+        cge::EventCursorExit,
         cge::EventScroll,
         cge::EventMouse,
         cge::EventKeyboard,
