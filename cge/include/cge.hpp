@@ -221,7 +221,7 @@ namespace cge
 {
     struct EventInit {};
     struct EventFocus { bool focused; };
-    struct EventReposition { double x, y, w, h; };
+    struct EventReposition { double x, y, w, h; double scale; };
     struct EventCursor { double x, y; };
     struct EventCursorExit {};
     struct EventScroll { double x, y; };

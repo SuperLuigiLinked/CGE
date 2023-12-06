@@ -245,8 +245,17 @@ extern "C"
         cge::Engine& engine{ *static_cast<cge::Engine*>(userdata) };
         if (window != engine.window) return;
         
-        (void)scale;
-        const cge::Event event{ cge::EventReposition { content.origin.x, content.origin.y, content.extent.w, content.extent.h } };
+        if ((content.extent.w > 0) && (content.extent.h > 0))
+        {
+            (void)engine.render_flag.test_and_set(std::memory_order::relaxed);
+            engine.render_flag.notify_all();
+        }
+        else
+        {
+            engine.render_flag.clear(std::memory_order::relaxed);
+        }
+
+        const cge::Event event{ cge::EventReposition { content.origin.x, content.origin.y, content.extent.w, content.extent.h, scale } };
         engine.game.event(engine, event);
     }
 
@@ -352,6 +361,8 @@ namespace cge
         
         for(;;)
         {
+            engine.render_flag.wait(false, std::memory_order::relaxed);
+
             if (!cge::await_signal(engine, cge::signal_render)) return {};
 
             engine.renderer->render(engine);

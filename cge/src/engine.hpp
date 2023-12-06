@@ -81,6 +81,7 @@ namespace cge
         bool cached_vsync;
         
         std::atomic<cge::Signal> signal;
+        std::atomic_flag render_flag;
     
     };
 }

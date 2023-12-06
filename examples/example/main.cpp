@@ -93,7 +93,7 @@ void App::event([[maybe_unused]] cge::Engine& engine, const cge::Event event)
     }
     else if (const auto* const evt = std::get_if<cge::EventCursor>(&event))
     {
-        this->cursor_hover = (evt->x < this->window_w) && (evt->y < this->window_h);
+        this->cursor_hover = (evt->x >= -1.0) && (evt->y >= -1.0) && (evt->x <= 1.0) && (evt->y <= 1.0);
         this->cursor_pos = { evt->x, evt->y };
     }
     else if (const auto* const evt = std::get_if<cge::EventCursorExit>(&event))
