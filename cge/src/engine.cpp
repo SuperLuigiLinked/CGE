@@ -142,29 +142,37 @@ extern "C"
     void wyn_on_start(void* const userdata)
     {
         cge::Engine& engine{ *static_cast<cge::Engine*>(userdata) };
-        
-        engine.window = wyn_window_open();
-        if (!engine.window) return cge::quit(engine);
+        {
+            engine.window = wyn_window_open();
+            if (!engine.window) return cge::quit(engine);
 
-        engine.scene.res_w = static_cast<cge::uint>(engine.settings.width);
-        engine.scene.res_h = static_cast<cge::uint>(engine.settings.height);
+            engine.epoch = wyt_nanotime();
+            engine.game.event(engine, cge::EventInit{});
+        }
+        {
+            engine.scene.res_w = static_cast<cge::uint>(engine.settings.width);
+            engine.scene.res_h = static_cast<cge::uint>(engine.settings.height);
 
-        const double scale{ wyn_window_scale(engine.window) };
-        wyn_window_resize(engine.window, { engine.settings.width * scale, engine.settings.height * scale });
-        engine.renderer->target_window(engine, engine.window);
+            const wyn_rect_t prev_rect{ wyn_window_position(engine.window) };
+            const wyn_point_t center{ .x = prev_rect.origin.x + prev_rect.extent.w / 2, .y = prev_rect.origin.y + prev_rect.extent.h / 2 };
+            const wyn_rect_t next_rect{
+                .origin = { .x = center.x - engine.settings.width / 2, .y = center.y - engine.settings.height / 2 },
+                .extent = { .w = engine.settings.width, .h = engine.settings.height }
+            };
+            wyn_window_reposition(engine.window, &next_rect.origin, &next_rect.extent);
+            
+            engine.renderer->target_window(engine, engine.window);
 
-        wyn_window_retitle(engine.window, reinterpret_cast<const wyn_utf8_t*>(engine.settings.name));
-        wyn_window_show(engine.window);
+            wyn_window_retitle(engine.window, reinterpret_cast<const wyn_utf8_t*>(engine.settings.name));
+            wyn_window_show(engine.window);
+        }
+        {
+            engine.render_thread = wyt_spawn(cge::render_main, userdata);
+            if (!engine.render_thread) return cge::quit(engine);
 
-        engine.epoch = wyt_nanotime();
-
-        engine.game.event(engine, cge::EventInit{});
-
-        engine.render_thread = wyt_spawn(cge::render_main, userdata);
-        if (!engine.render_thread) return cge::quit(engine);
-
-        engine.update_thread = wyt_spawn(cge::update_main, userdata);
-        if (!engine.update_thread) return cge::quit(engine);
+            engine.update_thread = wyt_spawn(cge::update_main, userdata);
+            if (!engine.update_thread) return cge::quit(engine);
+        }
     }
 
     void wyn_on_stop(void* const userdata)
