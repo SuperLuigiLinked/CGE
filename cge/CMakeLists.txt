@@ -62,6 +62,7 @@ target_compile_options(cge
         "-Wno-braced-scalar-init"
         "-Wno-unsafe-buffer-usage"
         "-Wno-cast-function-type"
+        "-Wno-float-equal"
         "-Wno-unused-macros"
 )
 if (APPLE)

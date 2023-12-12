@@ -2,7 +2,7 @@
  * @file examples/example/main.cpp
  */
 
-#include <wvk.h>
+#include <wyc.h>
 #include <cge.hpp>
 #include "../utils.hpp"
 
@@ -32,6 +32,8 @@ public:
     bool mb_R;
     bool mb_M;
     bool kb_Space;
+
+    bool toggle_fs;
     
     double cursor_rot = { 11.0 / 16.0 };
     cge::dvec2 cursor_pos;
@@ -112,7 +114,15 @@ void App::event([[maybe_unused]] cge::Engine& engine, const cge::Event event)
     }
     else if (const auto* const evt = std::get_if<cge::EventKeyboard>(&event))
     {
-        if (evt->keycode == (*this->vk_map)[wyn_vk_Space]) this->kb_Space = evt->pressed;
+        if (evt->keycode == (*this->vk_map)[wyn_vk_Space])
+        {
+            this->kb_Space = evt->pressed;
+        }
+
+        if (evt->pressed && (evt->keycode == (*this->vk_map)[wyn_vk_Escape]))
+        {
+            this->toggle_fs = true;
+        }
     }
     else if (const auto* const evt = std::get_if<cge::EventText>(&event))
     {
@@ -149,6 +159,12 @@ void App::render([[maybe_unused]] cge::Engine& engine, cge::Scene& scene)
     [[maybe_unused]] cge::Settings& settings{ cge::settings(engine) };
     LOG(fmt::fg(fmt::color::purple), "[RENDER] [{:.3f}] <{:.2f}> {}\n", secs, secs * settings.fps, this->renders);
     ++this->renders;
+
+    if (this->toggle_fs)
+    {
+        settings.fullscreen = !settings.fullscreen;
+        this->toggle_fs = false;
+    }
     
     scene.clear();
     

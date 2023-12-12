@@ -165,6 +165,7 @@ extern "C"
 
             wyn_window_retitle(engine.window, reinterpret_cast<const wyn_utf8_t*>(engine.settings.name));
             wyn_window_show(engine.window);
+            wyn_window_fullscreen(engine.window, engine.settings.fullscreen);
         }
         {
             engine.render_thread = wyt_spawn(cge::render_main, userdata);
@@ -211,6 +212,13 @@ extern "C"
             return;
         }
 
+        const wyn_rect_t old_rect{ wyn_window_position(engine.window) };
+        const wyn_bool_t old_fs{ wyn_window_is_fullscreen(engine.window) };
+        const char* const old_title{ engine.settings.name };
+        engine.settings.width = old_rect.extent.w;
+        engine.settings.height = old_rect.extent.h;
+        engine.settings.fullscreen = old_fs;
+
         if (signal & cge::signal_render)
         {
             engine.game.render(engine, engine.scene);
@@ -224,7 +232,13 @@ extern "C"
         }
 
         {
-           // wyn_window_resize(engine.window, { engine.settings.width, engine.settings.height });
+            const wyn_extent_t new_extent{ .w = engine.settings.width, .h = engine.settings.height };
+            const wyn_bool_t new_fs{ engine.settings.fullscreen };
+            const char* const new_title{ engine.settings.name };
+
+            if ((old_rect.extent.w != new_extent.w) || (old_rect.extent.h != new_extent.h)) wyn_window_reposition(engine.window, nullptr, &new_extent);
+            if (old_fs != new_fs) wyn_window_fullscreen(engine.window, new_fs);
+            if (old_title != new_title) wyn_window_retitle(engine.window, reinterpret_cast<const wyn_utf8_t*>(engine.settings.name));
         }
 
         (void)engine.signal.fetch_and(~signal, std::memory_order::release);
