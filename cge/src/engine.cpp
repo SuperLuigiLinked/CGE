@@ -395,8 +395,8 @@ namespace cge
     {
         cge::Engine& engine{ *static_cast<cge::Engine*>(arg) };
         
-        const wyt_time_t epoch{ engine.epoch };
-        wyt_time_t last_tick{ epoch };
+        const wyt_utime_t epoch{ engine.epoch };
+        wyt_utime_t last_tick{ epoch };
 
         for (;;)
         {
@@ -406,12 +406,12 @@ namespace cge
 
             if (fps > 0)
             {
-                const wyt_time_t frame_nanos{ static_cast<wyt_time_t>(1'000'000'000.0 / fps) };
-                const wyt_time_t last_nanos{ last_tick - epoch };
-                const wyt_time_t last_frame{ last_nanos / frame_nanos };
-                const wyt_time_t next_frame{ last_frame + 1 };
-                const wyt_time_t next_nanos{ next_frame * frame_nanos };
-                const wyt_time_t next_tick{ epoch + next_nanos };
+                const wyt_utime_t frame_nanos{ static_cast<wyt_utime_t>(1'000'000'000.0 / fps) };
+                const wyt_utime_t last_nanos{ last_tick - epoch };
+                const wyt_utime_t last_frame{ last_nanos / frame_nanos };
+                const wyt_utime_t next_frame{ last_frame + 1 };
+                const wyt_utime_t next_nanos{ next_frame * frame_nanos };
+                const wyt_utime_t next_tick{ epoch + next_nanos };
                 wyt_nanosleep_until(next_tick);
             }
             else

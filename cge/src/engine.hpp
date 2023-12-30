@@ -71,7 +71,7 @@ namespace cge
         cge::Settings settings;
         cge::Scene scene;
         
-        wyt_time_t epoch;
+        wyt_utime_t epoch;
         wyn_window_t window;
         wyt_thread_t update_thread;
         wyt_thread_t render_thread;
